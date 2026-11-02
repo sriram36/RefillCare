@@ -14,7 +14,7 @@ STORE = "rx_store"; os.makedirs(STORE, exist_ok=True)
 app = FastAPI(title="Pharmacy reorder")
 AREAS = {"Park Street": (22.5535, 88.3520), "Salt Lake": (22.5867, 88.4171), "Behala": (22.4985, 88.3118), "Howrah": (22.5800, 88.3250)}  # sample coordinates
 
-SCHEMA = """create table users(id integer primary key,name,phone unique,role);
+SCHEMA = """create table users(id integer primary key,name,phone unique,role,store_id);
 create table meds(id integer primary key,name,schedule,price,generic_of);
 create table stores(id integer primary key,name,lat,lng);
 create table stock(store_id,med_id,qty,primary key(store_id,med_id));
@@ -44,8 +44,9 @@ def init():
     if os.path.exists(DB): return
     c = db(); c.executescript(SCHEMA)
     for u in [(1, "Debasish Ghosh", "9000000001", "customer"), (2, "Rina Sen", "9000000002", "customer"),
-              (3, "Arif Mondal", "9000000003", "customer"), (9, "Anita Rao (pharmacist)", "9000000099", "pharmacist")]:
-        c.execute("insert into users values(?,?,?,?)", u)
+              (3, "Arif Mondal", "9000000003", "customer"), (5, "Store staff, Salt Lake", "9000000081", "store"), (6, "Store staff, Behala", "9000000082", "store"), (7, "Store staff, Howrah", "9000000083", "store"), (9, "Anita Rao (pharmacist)", "9000000099", "pharmacist")]:
+        c.execute("insert into users(id,name,phone,role) values(?,?,?,?)", u)
+    c.execute("update users set store_id=id-4 where role='store'")
     c.executemany("insert into profiles(customer_id,name,relation) values(?,?,?)", [(1, "Debasish Ghosh", "Self"), (1, "Mother", "Mother"), (2, "Rina Sen", "Self"), (3, "Arif Mondal", "Self")])
     c.executemany("insert into meds(id,name,schedule,price) values(?,?,?,?)", MEDS)
     c.executemany("insert into meds values(?,?,?,?,?)", [(10, "Metformin 500 mg (generic), strip of 15", "H", 80, 1), (11, "Telmisartan 40 mg (generic), strip of 10", "H", 190, 2)])
@@ -152,7 +153,9 @@ def full(o):
     o["store"] = (q("select name from stores where id=?", o["store_id"], one=True) or {}).get("name"); return o
 @app.get("/api/orders")
 def orders(u=Depends(auth)):
-    rows = q("select * from orders where customer_id=? order by created desc, code desc", u["id"]) if u["role"] == "customer" else q("select * from orders order by created desc, code desc")
+    if u["role"] == "customer": rows = q("select * from orders where customer_id=? order by created desc, code desc", u["id"])
+    elif u["role"] == "store": rows = q("select * from orders where store_id=? and status in ('awaiting_pharmacist','approved','packed','dispatched') order by created desc, code desc", u["store_id"])
+    else: rows = q("select * from orders order by created desc, code desc")
     return [full(o) for o in rows]
 @app.get("/api/orders/{code}/rx")
 def rx(code: str, u=Depends(auth)):
@@ -194,12 +197,13 @@ class Hold(BaseModel): reason: str
 def hold(code: str, b: Hold, u=Depends(auth)):
     need(u, "pharmacist"); ex("update orders set status='on_hold', note=? where code=?", b.reason.strip()[:200] or "Please upload a clearer prescription.", code); log(u["name"], "ask_reupload", code); return {"ok": True}
 def advance(code, frm, to, u, inv=None):
-    need(u, "pharmacist"); o = q("select * from orders where code=?", code, one=True)
+    need(u, "store"); o = q("select * from orders where code=?", code, one=True)
     if not o: raise HTTPException(404, "Order not found")
     its = q("select * from items where order_code=?", code)
     for i in its: i["registered"] = bool(q("select 1 x from register where item_id=?", i["id"]))
     ok, why = can_dispatch(its)
     if not ok: log(u["name"], f"blocked_{to}", code); raise HTTPException(403, {"code": "APPROVAL_REQUIRED", "message": why})
+    if o["store_id"] != u["store_id"]: raise HTTPException(403, "This order belongs to another store")
     if o["status"] != frm or not o["store_id"]: raise HTTPException(409, f"Order must be {frm} and routed to a store first")
     ex("update orders set status=?, invoice_no=coalesce(?, invoice_no) where code=?", to, inv, code); log(u["name"], to, code); return {"ok": True}
 class Pack(BaseModel): invoice: str
