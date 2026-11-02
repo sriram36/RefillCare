@@ -1,0 +1,5 @@
+.env
+*.db
+*.enc
+__pycache__/
+rx_store/
