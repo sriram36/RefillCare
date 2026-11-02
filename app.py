@@ -15,6 +15,7 @@ from datetime import date, timedelta
 from cryptography.fernet import Fernet
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageDraw, ImageFilter
 from pydantic import BaseModel
 
@@ -29,6 +30,7 @@ STORE = "rx_store"
 os.makedirs(STORE, exist_ok=True)
 
 app = FastAPI(title="Pharmacy reorder")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 AREAS = {
     "Park Street": (22.5535, 88.3520),

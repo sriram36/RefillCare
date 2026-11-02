@@ -1,7 +1,7 @@
 # RefillCare: Technical Design Document
 
 Version 1.0 · 2 November 2026 · Author: Sriram Kolli  
-GitHub: https://github.com/sriram36/RefillCare.git  ·  Live app: <add URL if deployed>
+GitHub: https://github.com/sriram36/RefillCare.git  ·  Live app: https://refillcare.onrender.com/
 
 ## 1. Architecture and why
 FastAPI + SQLite, single service, plain HTML/JS frontend without build frameworks. Chosen so the entire core slice runs with one command (`uvicorn app:app`) and a reviewer can evaluate it immediately with zero complex toolchains. Pure business rules live in `rules.py` (no DB dependencies, cleanly isolated, and 100% unit-tested). Moving to Postgres and Next.js represents the next scaling step, not a architectural rethink.

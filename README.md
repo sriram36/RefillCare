@@ -3,7 +3,7 @@
 A reliable, privacy-first online pharmacy reordering application designed for pharmacy chains. Built with FastAPI, SQLite, and vanilla HTML/JS.
 
 - **Repository:** [https://github.com/sriram36/RefillCare](https://github.com/sriram36/RefillCare)
-- **Live Demo:** `<add URL if deployed>`
+- **Live Demo:** [https://refillcare.onrender.com/](https://refillcare.onrender.com/)
 
 ---
 

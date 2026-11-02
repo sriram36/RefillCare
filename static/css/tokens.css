@@ -1,0 +1,68 @@
+:root {
+  /* Brand & Healthcare Palette */
+  --teal: #1e595c;
+  --teal-hover: #153e40;
+  --teal-light: #e6f3f4;
+  --teal-gradient: linear-gradient(135deg, #1e595c 0%, #2b787c 100%);
+  --ink: #16242b;
+  --mute: #54656f;
+  --bg: #f4f7f8;
+  --card: #ffffff;
+  --line: #d8e2e6;
+  --line-focus: #1e595c;
+  
+  /* Status Colors */
+  --amber: #b26b00;
+  --amber-light: #fef7ec;
+  --red: #c02b2b;
+  --red-light: #fdf2f2;
+  --green: #238350;
+  --green-light: #edf7f1;
+
+  /* Typography */
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Sizing & Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 9999px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(18, 38, 48, 0.05);
+  --shadow-card: 0 2px 6px rgba(18, 38, 48, 0.06), 0 1px 2px rgba(18, 38, 48, 0.04);
+  --shadow-hover: 0 6px 16px rgba(18, 38, 48, 0.08), 0 2px 4px rgba(18, 38, 48, 0.04);
+  --shadow-lg: 0 12px 28px rgba(18, 38, 48, 0.12), 0 4px 8px rgba(18, 38, 48, 0.06);
+
+  /* Transitions */
+  --tr-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --tr-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --teal: #6ec0c5;
+    --teal-hover: #8fd0d4;
+    --teal-light: rgba(110, 192, 197, 0.15);
+    --teal-gradient: linear-gradient(135deg, #275d61 0%, #3a7a7e 100%);
+    --ink: #eaf1f4;
+    --mute: #9cb1bc;
+    --bg: #0f1519;
+    --card: #182126;
+    --line: #27353c;
+    --line-focus: #6ec0c5;
+
+    --amber: #f2ad43;
+    --amber-light: rgba(242, 173, 67, 0.15);
+    --red: #f27972;
+    --red-light: rgba(242, 121, 114, 0.15);
+    --green: #59cb8b;
+    --green-light: rgba(89, 203, 139, 0.15);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.4);
+    --shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.6);
+  }
+}
