@@ -1,0 +1,5 @@
+.git
+*.db
+rx_store
+__pycache__
+.env
