@@ -3,3 +3,5 @@
 rx_store
 __pycache__
 .env
+.venv
+
