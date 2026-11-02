@@ -6,3 +6,4 @@ rx_store/
 .venv
 *.pdf
 *.zip
+node_modules
