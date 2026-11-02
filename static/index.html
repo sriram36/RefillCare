@@ -1,0 +1,77 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pharmacy reorder</title>
+<style>
+:root{--ink:#1d2b33;--mute:#5c6b73;--bg:#f6f8f9;--card:#fff;--line:#dde4e8;--teal:#2f6f73;--amber:#a86a0c;--red:#b3261e;--green:#2e7d4f}
+@media(prefers-color-scheme:dark){:root{--ink:#e8eef1;--mute:#9fb0b8;--bg:#12191d;--card:#1a2328;--line:#2b373d;--teal:#6fb8bc;--amber:#e0a84a;--red:#f08a82;--green:#6fcf97}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.5 system-ui,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+main{max-width:1100px;margin:0 auto;padding:20px}h2{font-size:1.15rem;margin:28px 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px}
+button,select,input{font:inherit;padding:10px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+button{cursor:pointer}button.p{background:var(--teal);color:#fff;border-color:var(--teal)}button.big{width:100%;font-size:1.3rem;padding:20px}
+button.d{color:var(--red)}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.pill{padding:2px 10px;border-radius:99px;border:1px solid var(--line);font-size:.85rem;white-space:nowrap}
+.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}.mute{color:var(--mute);font-size:.9rem}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.split{display:grid;grid-template-columns:280px 1fr;gap:16px}@media(max-width:800px){.split{grid-template-columns:1fr}}
+.q{cursor:pointer}.q.on{border-color:var(--teal)}img.rx{width:100%;border:1px solid var(--line);border-radius:8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:800px){.two{grid-template-columns:1fr}}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:8px;display:none;max-width:90%}
+</style></head><body>
+<header><strong>Pharmacy reorder</strong><span id="who"></span></header><main id="app" aria-live="polite"></main><div id="toast" role="alert"></div>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let T=localStorage.t||'',U=JSON.parse(localStorage.u||'null'),SEL=null;
+let LG=localStorage.lg||'en',TAB='q';const L={en:{reorder:'Reorder my medicines',low:'Running low',upload:'Upload a prescription',orders:'Your orders',send:'Send for pharmacist check'},bn:{reorder:'আমার ওষুধ আবার অর্ডার করুন',low:'ওষুধ শেষ হয়ে আসছে',upload:'প্রেসক্রিপশন আপলোড করুন',orders:'আপনার অর্ডার',send:'ফার্মাসিস্টের কাছে পাঠান'},hi:{reorder:'मेरी दवाइयाँ दोबारा मँगवाएँ',low:'दवाइयाँ खत्म होने वाली हैं',upload:'पर्चा अपलोड करें',orders:'आपके ऑर्डर',send:'फार्मासिस्ट को भेजें'}};const t=k=>L[LG][k];
+const LBL={awaiting_pharmacist:['Waiting for pharmacist','warn'],on_hold:['Please upload a clearer photo','bad'],approved:['Approved','ok'],packed:['Packed','ok'],dispatched:['On the way','ok'],rejected:['Not available','bad']};
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',4000)}
+async function api(p,o={}){const f=o.body instanceof FormData;const r=await fetch('/api/'+p,{...o,headers:{...(o.body&&!f?{'Content-Type':'application/json'}:{}),Authorization:T}});
+ const j=await r.json().catch(()=>({}));if(r.status===401&&T){out();}if(!r.ok)throw new Error(j.detail?.message||j.detail||'Something went wrong. Try again.');return j}
+const post=(p,b)=>api(p,{method:'POST',body:b===undefined?undefined:JSON.stringify(b)});
+function out(){T='';U=null;localStorage.clear();render()}
+async function act(fn,msg){try{await fn();if(msg)toast(msg);render()}catch(e){toast(e.message)}}
+const pill=s=>{const[l,c]=LBL[s]||[s,''];return `<span class="pill ${c}">${l}</span>`};
+async function render(){
+ $('#who').innerHTML=`<select onchange="LG=this.value;localStorage.lg=LG;render()" aria-label="Language"><option value="en">English</option><option value="bn" ${LG=='bn'?'selected':''}>বাংলা</option><option value="hi" ${LG=='hi'?'selected':''}>हिन्दी</option></select> `+(U?`${esc(U.name)} <button onclick="out()">Sign out</button>`:'');
+ if(!U)return $('#app').innerHTML=`<div class="card"><h2>Sign in</h2><p class="mute">Demo OTP is 123456.</p>
+ <div class="row"><input id="ph" inputmode="numeric" placeholder="Phone number"><input id="otp" placeholder="OTP" value="123456"><button class="p" onclick="login()">Sign in</button></div></div>
+ <div class="card"><b>Demo accounts</b><div class="row" style="justify-content:flex-start;margin-top:8px">
+ <button onclick="fill('9000000001')">Customer: Debasish</button><button onclick="fill('9000000002')">Customer: Rina</button><button onclick="fill('9000000099')">Pharmacist</button></div></div>`;
+ $('#app').innerHTML='<p class="mute">Loading…</p>';
+ try{U.role==='customer'?await customer():await pharmacist()}catch(e){$('#app').innerHTML=`<div class="card bad">${esc(e.message)} <button onclick="render()">Try again</button></div>`}}
+function fill(p){$('#ph').value=p}
+async function login(){try{const r=await post('login',{phone:$('#ph').value,otp:$('#otp').value});T=r.token;U=r.user;localStorage.t=T;localStorage.u=JSON.stringify(U);render()}catch(e){toast(e.message)}}
+async function customer(){const[rf,os,pr,nt]=await Promise.all([api('refills'),api('orders'),api('profiles'),api('notes')]);
+ const due=rf.filter(r=>r.due);
+ $('#app').innerHTML=`<button class="p big" onclick="document.getElementById('up').scrollIntoView()">${t('reorder')}</button>
+ <h2>${t('low')}</h2>${due.length?due.map(r=>`<div class="card row"><div><b>${esc(r.name)}</b><br><span class="mute">For ${esc(r.for_name)}. About ${r.days_left} days left.</span></div><button class="p" onclick="act(()=>post('refills/${r.id}/reorder'),'Sent to the pharmacist')">Reorder</button></div>`).join(''):'<p class="mute">Nothing is running low. We will remind you before it does.</p>'}
+ <h2 id="up">${t('upload')}</h2><form class="card" onsubmit="up(event)"><div class="row" style="justify-content:flex-start">
+ <select name="for_name" aria-label="Who is it for">${pr.map(p=>`<option>${esc(p.name)}</option>`).join('')}</select><button type="button" onclick="addp()">Add a person</button><select name="payment" aria-label="Payment"><option value="cod">Cash on delivery</option><option value="upi_test">UPI (test mode)</option></select><select name="area" aria-label="Delivery area">${['Park Street','Salt Lake','Behala','Howrah'].map(a=>`<option>${a}</option>`).join('')}</select><input type="file" name="file" accept="image/png,image/jpeg">
+ <select name="demo"><option value="">No demo</option><option value="clean">Demo: clear printed</option><option value="handwritten">Demo: handwritten</option><option value="blurry">Demo: blurry</option><option value="schedx">Demo: restricted item</option><option value="h1">Demo: controlled (H1)</option></select>
+ <button class="p">${t('send')}</button></div><p class="mute">A pharmacist checks every prescription before anything is packed.</p></form>
+ ${nt.length?`<h2>Messages</h2>${nt.map(n=>`<div class="card mute">${esc(n.text)}</div>`).join('')}`:''}<h2>${t('orders')}</h2>${os.length?os.map(o=>`<div class="card"><div class="row"><b>${o.code}</b>${pill(o.status)}</div><div class="mute">For ${esc(o.for_name)}${o.store?'. Store: '+esc(o.store):''}${o.payment==='upi_test'?'. UPI (test mode): paid':'. Pay on delivery'}</div>${o.note?`<div class="${o.status==='on_hold'?'bad':'mute'}">${esc(o.note)}</div>`:''}
+ ${o.items.map(i=>`<div>${esc(i.name)} × ${i.qty} ${i.status==='rejected'?`<span class="bad">(${esc(i.reason)})</span>`:''}${i.offer_med&&i.consent==null?`<div class="card">Your pharmacist suggests a cheaper generic: <b>${esc(i.offer_med.name)}</b> (₹${i.offer_med.price} instead of ₹${i.price}). <button class="p" onclick="act(()=>post('items/${i.id}/consent',{accept:true}),'Generic accepted')">Accept</button> <button onclick="act(()=>post('items/${i.id}/consent',{accept:false}),'Keeping the original')">Keep original</button></div>`:''}</div>`).join('')}</div>`).join(''):'<div class="card mute">No orders yet. Upload a prescription to start.</div>'}`}
+function up(e){e.preventDefault();const f=new FormData(e.target);if(!f.get('file').size)f.delete('file');act(()=>api('orders',{method:'POST',body:f}),'Sent to the pharmacist')}
+async function pharmacist(){if(TAB==='d')return dash();const os=await api('orders');SEL=SEL&&os.find(o=>o.code===SEL.code)||os.find(o=>o.status==='awaiting_pharmacist')||os[0];
+ $('#app').innerHTML=`<div class="row" style="justify-content:flex-start"><button onclick="TAB='d';render()">Dashboard</button></div><h2>Verification queue</h2><div class="split"><div>${os.map(o=>`<div class="card q ${SEL&&o.code===SEL.code?'on':''}" onclick="SEL=${esc(JSON.stringify({code:o.code}))};render()"><b>${o.code}</b><br>${pill(o.status)}<div class="mute">${esc(o.for_name)}</div></div>`).join('')||'<p class="mute">Queue is empty.</p>'}</div><div id="rv"></div></div>`;
+ if(SEL)review(SEL)}
+async function review(o){const t=o.status==='approved'?'pack':o.status==='packed'?'dispatch':'';
+ $('#rv').innerHTML=`<div class="row"><h2 style="margin:0">${o.code} · ${esc(o.for_name)}</h2>${pill(o.status)}</div>${o.note?`<p class="warn">${esc(o.note)}</p>`:''}
+ <div class="two"><div class="card" id="img"><p class="mute">Loading prescription…</p></div><div>${o.items.map(i=>`<div class="card"><b>${esc(i.name)}</b> <span class="pill">${i.schedule}</span>
+ <div class="${i.conf<.75?'warn':'ok'}">${i.conf<.75?'Low confidence. Check against the image.':'Matched'} (${Math.round(i.conf*100)}%)</div>
+ ${i.status==='draft'?`<div class="row" style="justify-content:flex-start;margin-top:8px"><input id="q${i.id}" type="number" min="1" max="50" value="${i.qty}" style="width:80px" aria-label="Quantity"><button class="p" onclick="appr(${i.id},'${i.schedule}')">Approve</button><button class="d" onclick="rej(${i.id})">Reject</button></div>`:`<div class="${i.status==='approved'?'ok':'bad'}">${i.status==='approved'?'Approved':'Rejected: '+esc(i.reason)}${i.status==='approved'&&i.generic&&!i.offer?` <button onclick="act(()=>post('items/${i.id}/offer-generic'),'Generic offered')">Offer cheaper generic (₹${i.generic.price})</button>`:''}${i.offer?` <span class="mute">${i.consent==null?'Waiting for customer':i.consent?'Customer accepted the generic':'Customer kept the original'}</span>`:''}</div>`}</div>`).join('')||'<div class="card mute">No lines were read. Ask for a new photo.</div>'}
+ <div class="row" style="justify-content:flex-start"><button onclick="hold('${o.code}')">Ask for new photo</button><button class="p" onclick="act(()=>pack('${o.code}'),'Packed')">Pack</button><button class="p" onclick="act(()=>post('orders/${o.code}/dispatch'),'Handed to delivery')">Hand to delivery</button></div></div></div>`;
+ try{const r=await fetch('/api/orders/'+o.code+'/rx',{headers:{Authorization:T}});if(!r.ok)throw 0;$('#img').innerHTML=`<img class="rx" alt="Prescription" src="${URL.createObjectURL(await r.blob())}">`}catch{$('#img').innerHTML='<p class="mute">No prescription image on file for this order.</p>'}}
+function appr(id,s){const b={action:'approve',qty:+$('#q'+id).value};if(s==='H1'){b.prescriber=prompt('Prescriber name (H1 register)');b.patient=prompt('Patient name (H1 register)');if(!b.prescriber||!b.patient)return}act(()=>post('items/'+id+'/decide',b),'Approved')}
+function pack(c){const v=prompt('Store invoice number');if(v)act(()=>post('orders/'+c+'/pack',{invoice:v}),'Packed')}
+function stk(e){e.preventDefault();act(()=>api('stock',{method:'POST',body:new FormData(e.target)}),'Stock updated')}
+async function dash(){const d=await api('dashboard'),rows=o=>Object.entries(o).map(([k,v])=>`<div class="row"><span>${esc(k)}</span><b>${v}</b></div>`).join('');
+ $('#app').innerHTML=`<div class="row" style="justify-content:flex-start"><button onclick="TAB='q';render()">Queue</button></div><h2>Across all stores</h2><div class="card">Median time to verify: <b>${d.median_verify_min??'n/a'} min</b></div>
+ <div class="two"><div class="card"><b>Orders by store</b>${rows(d.by_store)}</div><div class="card"><b>Rejections</b>${rows(d.rejections)||'<p class="mute">None yet.</p>'}</div></div>
+ <h2>H1 register</h2>${d.register.map(r=>`<div class="card">${esc(r.order_code)}: prescriber ${esc(r.prescriber)}, patient ${esc(r.patient)}, quantity ${r.qty}</div>`).join('')||'<p class="mute">No H1 sales yet.</p>'}
+ <h2>Daily stock file</h2><form class="card" onsubmit="stk(event)"><input type="file" name="file" accept=".csv" required> <button class="p">Upload stock CSV</button></form>
+ <h2>Refill reminders</h2><div class="card"><button class="p" onclick="act(()=>post('reminders/run'),'Reminders sent')">Send today's reminders</button></div><h2>Recent activity</h2>${d.audit.map(a=>`<div class="mute">${new Date(a.ts*1000).toLocaleTimeString()}: ${esc(a.actor)}, ${esc(a.action)}, ${esc(a.entity)}</div>`).join('')}`}
+function addp(){const n=prompt('Name');if(n)act(()=>post('profiles',{name:n,relation:prompt('Relation, for example Mother','Family')||'Family'}),'Added')}
+function rej(id){const r=prompt('Reason for rejecting (required)');if(r)act(()=>post('items/'+id+'/decide',{action:'reject',reason:r}),'Rejected')}
+function hold(c){const r=prompt('What should the customer fix?','Please upload a clearer photo.');if(r)act(()=>post('orders/'+c+'/hold',{reason:r}),'Customer asked to re-upload')}
+render();
+</script></body></html>
