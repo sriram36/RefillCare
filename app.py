@@ -6,6 +6,7 @@ import hmac
 import io
 import json
 import os
+import shutil
 import sqlite3
 import statistics
 import time
@@ -59,6 +60,8 @@ def db():
 
 
 def q(sql: str, *args, one: bool = False):
+    # Single-connection-per-call: acceptable for single-worker SQLite.
+    # Use explicit transactions for multi-statement atomicity in production.
     connection = db()
     cursor = connection.execute(sql, args)
     rows = [dict(row) for row in cursor]
@@ -424,7 +427,9 @@ def extract(raw: bytes, demo: str):
     if os.getenv("AZURE_OPENAI_ENDPOINT"):
         try:
             return azure(raw)
-        except Exception:
+        except Exception as e:
+            # Log the error visibly in server output; fall back to manual pharmacist review.
+            print(f"[azure] extraction failed: {e}", flush=True)
             return {"legible": None, "lines": []}  # AI down -> manual review
     return DEMOS.get(demo, {"legible": None, "lines": []})  # no key and no demo: nothing guessed
 
@@ -493,9 +498,11 @@ async def new_order(
     if payment not in ("cod", "upi_test") or area not in AREAS:
         raise HTTPException(422, "Choose a valid payment method and delivery area")
 
+    # Not race-safe under concurrent load; use a DB sequence or UUID for production.
     order_count = q("select count(*) n from orders", one=True)["n"]
     code = f"RX-{50220 + order_count}"
-    open(f"{STORE}/{code}.enc", "wb").write(Fernet(FKEY).encrypt(raw))
+    with open(f"{STORE}/{code}.enc", "wb") as enc_file:
+        enc_file.write(Fernet(FKEY).encrypt(raw))
 
     res = extract(raw, demo)
     note = ""
@@ -589,7 +596,8 @@ async def reupload_rx(
     if not (raw[:4] == b"\x89PNG" or raw[:3] == b"\xff\xd8\xff"):
         raise HTTPException(415, "Upload a PNG or JPEG photo")
 
-    open(f"{STORE}/{code}.enc", "wb").write(Fernet(FKEY).encrypt(raw))
+    with open(f"{STORE}/{code}.enc", "wb") as enc_file:
+        enc_file.write(Fernet(FKEY).encrypt(raw))
     ex("delete from items where order_code = ?", code)
 
     res = extract(raw, demo)
@@ -694,7 +702,8 @@ def get_rx_image(code: str, u=Depends(auth)):
     if not o or not o["rx_file"] or not os.path.exists(f"{STORE}/{o['rx_file']}"):
         raise HTTPException(404, "No prescription image on file")
     log(u["name"], "view_rx", code)
-    decrypted_bytes = Fernet(FKEY).decrypt(open(f"{STORE}/{o['rx_file']}", "rb").read())
+    with open(f"{STORE}/{o['rx_file']}", "rb") as enc_file:
+        decrypted_bytes = Fernet(FKEY).decrypt(enc_file.read())
     return Response(content=decrypted_bytes, media_type="image/png")
 
 
@@ -948,8 +957,6 @@ def reorder(rid: int, u=Depends(auth)):
     )
 
     if valid_rx and valid_rx["rx_file"] and os.path.exists(f"{STORE}/{valid_rx['rx_file']}"):
-        import shutil
-
         rx_file = f"{code}.enc"
         shutil.copyfile(f"{STORE}/{valid_rx['rx_file']}", f"{STORE}/{rx_file}")
         status = "awaiting_pharmacist"
@@ -1041,12 +1048,15 @@ def consent(iid: int, b: Consent, u=Depends(auth)):
 def dashboard(u=Depends(auth)):
     need(u, "pharmacist")
     all_orders = q("select * from orders")
-    by_store = {}
-    rejections = {}
+
+    # Load all store names once — avoids N+1 queries per order.
+    store_names: dict[int, str] = {s["id"]: s["name"] for s in q("select id, name from stores")}
+
+    by_store: dict[str, int] = {}
+    rejections: dict[str, int] = {}
 
     for o in all_orders:
-        store_rec = q("select name from stores where id = ?", o["store_id"], one=True)
-        name = store_rec["name"] if store_rec else "Not routed"
+        name = store_names.get(o["store_id"], "Not routed")
         by_store[name] = by_store.get(name, 0) + 1
 
     for i in q("select reason from items where status = 'rejected'"):
@@ -1329,7 +1339,8 @@ def seed_images():
         o = q("select rx_file from orders where code = ?", code, one=True)
         if o and not o["rx_file"]:
             enc = Fernet(FKEY).encrypt(demo_png(kind))
-            open(f"{STORE}/{code}.enc", "wb").write(enc)
+            with open(f"{STORE}/{code}.enc", "wb") as enc_file:
+                enc_file.write(enc)
             ex("update orders set rx_file = ? where code = ?", f"{code}.enc", code)
 
 
