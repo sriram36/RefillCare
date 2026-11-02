@@ -271,24 +271,126 @@
         low: 'Running low',
         upload: 'Upload a prescription',
         orders: 'Your orders',
-        send: 'Send for pharmacist check'
+        send: 'Send for pharmacist check',
+        search_title: 'Search medicines',
+        search_ph: 'Search by name, for example paracetamol',
+        no_low: 'Nothing is running low. We will remind you before it does.',
+        add_person: 'Add a person',
+        cart_title: 'Your cart',
+        place_order: 'Place order',
+        clear_cart: 'Clear',
+        messages: 'Messages',
+        no_orders: 'No orders yet. Upload a prescription to start.',
+        for_lbl: 'For',
+        store_lbl: 'Store',
+        cod: 'Cash on delivery',
+        upi_test: 'UPI (test mode)',
+        paid_upi: 'UPI (test mode): paid',
+        pay_delivery: 'Pay on delivery',
+        upload_new: 'Upload a new photo',
+        generic_offer: 'Your pharmacist suggests a cheaper generic:',
+        instead_of: 'instead of',
+        accept: 'Accept',
+        keep_original: 'Keep original',
+        waiting_customer: 'Waiting for customer',
+        generic_accepted: 'Customer accepted the generic',
+        generic_kept: 'Customer kept the original',
+        consent_title: 'Consent to process health data (DPDP Act, 2023)',
+        consent_body: 'What we collect: Prescription images and monthly medicine reorders.\nWhy: To allow registered pharmacists to verify and dispense your medicines safely.\nWho sees it: Registered pharmacists and assigned store staff only.',
+        consent_btn: 'I agree and continue',
+        export_data: 'Export my data (DPDP)',
+        status_awaiting_pharmacist: 'Waiting for pharmacist',
+        status_on_hold: 'Please upload a clearer photo',
+        status_approved: 'Approved',
+        status_packed: 'Packed',
+        status_dispatched: 'On the way',
+        status_rejected: 'Not available',
+        rx_safety_note: 'A pharmacist checks every prescription before anything is packed.'
       },
       bn: {
         reorder: 'আমার ওষুধ আবার অর্ডার করুন',
         low: 'ওষুধ শেষ হয়ে আসছে',
         upload: 'প্রেসক্রিপশন আপলোড করুন',
         orders: 'আপনার অর্ডার',
-        send: 'ফার্মাসিস্টের কাছে পাঠান'
+        send: 'ফার্মাসিস্টের কাছে পাঠান',
+        search_title: 'ওষুধ খুঁজুন',
+        search_ph: 'নাম দিয়ে খুঁজুন, যেমন প্যারাসিটামল',
+        no_low: 'কোনো ওষুধ শেষ হচ্ছে না। শেষ হওয়ার আগে মনে করিয়ে দেব।',
+        add_person: 'সদস্য যোগ করুন',
+        cart_title: 'আপনার কার্ট',
+        place_order: 'অর্ডার নিশ্চিত করুন',
+        clear_cart: 'খালি করুন',
+        messages: 'বার্তা',
+        no_orders: 'এখনও কোনো অর্ডার নেই। শুরু করতে প্রেসক্রিপশন আপলোড করুন।',
+        for_lbl: 'কার জন্য',
+        store_lbl: 'দোকান',
+        cod: 'ক্যাশ অন ডেলিভারি',
+        upi_test: 'ইউপিআই (পরীক্ষামূলক)',
+        paid_upi: 'ইউপিআই (পরীক্ষামূলক): পরিশোধিত',
+        pay_delivery: 'ডেলিভারিতে মূল্য পরিশোধ',
+        upload_new: 'নতুন ছবি আপলোড করুন',
+        generic_offer: 'ফার্মাসিস্ট সাশ্রয়ী জেনেরিক ওষুধ সুপারিশ করেছেন:',
+        instead_of: 'এর পরিবর্তে',
+        accept: 'গ্রহণ করুন',
+        keep_original: 'আসলটি রাখুন',
+        waiting_customer: 'গ্রাহকের উত্তরের অপেক্ষায়',
+        generic_accepted: 'গ্রাহক জেনেরিক গ্রহণ করেছেন',
+        generic_kept: 'গ্রাহক আসল ওষুধ রেখেছেন',
+        consent_title: 'স্বাস্থ্য তথ্যের প্রক্রিয়াকরণে সম্মতি (DPDP আইন, ২০২৩)',
+        consent_body: 'কী সংগ্রহ করা হয়: প্রেসক্রিপশনের ছবি এবং ওষুধ রিফিল অর্ডার।\nকেন: নিবন্ধিত ফার্মাসিস্ট দ্বারা পরীক্ষা এবং ওষুধ বিতরণের জন্য।\nকারা দেখেন: কেবল নিবন্ধিত ফার্মাসিস্ট এবং দোকানের অনুমোদিত কর্মীরা।',
+        consent_btn: 'আমি সম্মত ও এগিয়ে চলুন',
+        export_data: 'আমার তথ্য রপ্তানি করুন (DPDP)',
+        status_awaiting_pharmacist: 'ফার্মাসিস্টের অপেক্ষায়',
+        status_on_hold: 'অনুগ্রহ করে স্পষ্ট ছবি আপলোড করুন',
+        status_approved: 'অনুমোদিত',
+        status_packed: 'প্যাক করা হয়েছে',
+        status_dispatched: 'পথে আছে',
+        status_rejected: 'অনুপলব্ধ',
+        rx_safety_note: 'প্যাকিং করার আগে একজন ফার্মাসিস্ট প্রতিটি প্রেসক্রিপশন যাচাই করেন।'
       },
       hi: {
         reorder: 'मेरी दवाइयाँ दोबारा मँगवाएँ',
         low: 'दवाइयाँ खत्म होने वाली हैं',
         upload: 'पर्चा अपलोड करें',
         orders: 'आपके ऑर्डर',
-        send: 'फार्मासिस्ट को भेजें'
+        send: 'फार्মাसिस्ट को भेजें',
+        search_title: 'दवाइयाँ खोजें',
+        search_ph: 'नाम से खोजें, जैसे पैरासिटामोल',
+        no_low: 'कोई दवाई खत्म नहीं हो रही है। समय पर याद दिलाएंगे।',
+        add_person: 'व्यक्ति जोड़ें',
+        cart_title: 'आपकी कार्ट',
+        place_order: 'ऑर्डर दें',
+        clear_cart: 'खाली करें',
+        messages: 'संदेश',
+        no_orders: 'अभी कोई ऑर्डर नहीं है। शुरू करने के लिए पर्चा अपलोड करें।',
+        for_lbl: 'के लिए',
+        store_lbl: 'स्टोर',
+        cod: 'डिलीवरी पर नकद',
+        upi_test: 'यूपीआई (टेस्ट मोड)',
+        paid_upi: 'यूपीआई (टेस्ट मोड): भुगतान हो गया',
+        pay_delivery: 'डिलीवरी पर भुगतान',
+        upload_new: 'नई फोटो अपलोड करें',
+        generic_offer: 'फार्मासिस्ट सस्ती जेनेरिक दवा का सुझाव दे रहे हैं:',
+        instead_of: 'के बजाय',
+        accept: 'स्वीकार करें',
+        keep_original: 'मूल दवा रखें',
+        waiting_customer: 'ग्राहक की पुष्टि की प्रतीक्षा',
+        generic_accepted: 'ग्राहक ने जेनेरिक स्वीकार किया',
+        generic_kept: 'ग्राहक ने मूल दवा रखी',
+        consent_title: 'स्वास्थ्य डेटा की सहमति (DPDP अधिनियम, 2023)',
+        consent_body: 'हम क्या एकत्र करते हैं: पर्चे की फोटो और दवाओं के ऑर्डर।\nक्यों: पंजीकृत फार्मासिस्ट द्वारा जांच और सुरक्षित दवा वितरण के लिए।\nकौन देखता है: केवल पंजीकृत फार्मासिस्ट और स्टोर स्टाफ।',
+        consent_btn: 'मैं सहमत हूँ और आगे बढ़ें',
+        export_data: 'मेरा डेटा डाउनलोड करें (DPDP)',
+        status_awaiting_pharmacist: 'फार्मासिस्ट की प्रतीक्षा',
+        status_on_hold: 'कृपया साफ फोटो अपलोड करें',
+        status_approved: 'स्वीकृत',
+        status_packed: 'पैक हो गया',
+        status_dispatched: 'रास्ते में है',
+        status_rejected: 'उपलब्ध नहीं',
+        rx_safety_note: 'दवा पैक करने से पहले फार्मासिस्ट हर पर्चे की जांच करते हैं।'
       }
     };
-    const t = k => L[LG][k];
+    const t = k => (L[LG] && L[LG][k]) || L.en[k] || k;
 
     const LBL = {
       awaiting_pharmacist: ['Waiting for pharmacist', 'warn'],
@@ -330,7 +432,10 @@
       body: body === undefined ? undefined : JSON.stringify(body)
     });
 
-    function out() {
+    async function out() {
+      try {
+        if (T) await post('logout');
+      } catch (e) {}
       T = '';
       U = null;
       localStorage.clear();
@@ -348,7 +453,10 @@
     }
 
     const pill = status => {
-      const [label, colorClass] = LBL[status] || [status, ''];
+      const key = 'status_' + status;
+      const translated = L[LG] && L[LG][key];
+      const [defaultLabel, colorClass] = LBL[status] || [status, ''];
+      const label = translated || defaultLabel;
       return `<span class="pill ${colorClass}">${label}</span>`;
     };
 
@@ -428,7 +536,19 @@
       ]);
       const due = rf.filter(r => r.due);
 
+      const consentBanner = !U.consent_at ? `
+        <div class="card" style="border: 2px solid var(--amber); background: rgba(168, 106, 12, 0.05); margin-bottom: 20px;">
+          <h3 style="margin-top:0">${esc(t('consent_title'))}</h3>
+          <p style="white-space: pre-line; line-height: 1.6;">${esc(t('consent_body'))}</p>
+          <button class="p" onclick="act(async () => {
+            const res = await post('consent');
+            U.consent_at = res.consent_at;
+            localStorage.u = JSON.stringify(U);
+          }, 'Consent recorded')">${esc(t('consent_btn'))}</button>
+        </div>` : '';
+
       $('#app').innerHTML = `
+        ${consentBanner}
         <button class="p big" onclick="document.getElementById('up').scrollIntoView()">${t('reorder')}</button>
 
         <h2>${t('low')}</h2>
@@ -437,15 +557,15 @@
               <div class="card row">
                 <div>
                   <b>${esc(r.name)}</b><br>
-                  <span class="mute">For ${esc(r.for_name)}. About ${r.days_left} days left.</span>
+                  <span class="mute">${t('for_lbl')} ${esc(r.for_name)}. About ${r.days_left} days left.</span>
                 </div>
                 <button class="p" onclick="act(()=>post('refills/${r.id}/reorder'), 'Sent to the pharmacist')">Reorder</button>
               </div>`).join('')
-          : '<p class="mute">Nothing is running low. We will remind you before it does.</p>'
+          : `<p class="mute">${t('no_low')}</p>`
         }
 
-        <h2>Search medicines</h2>
-        <input id="sq" placeholder="Search by name, for example paracetamol" oninput="srch(this.value)" style="width:100%" aria-label="Search medicines">
+        <h2>${t('search_title')}</h2>
+        <input id="sq" placeholder="${esc(t('search_ph'))}" oninput="srch(this.value)" style="width:100%" aria-label="Search medicines">
         <div id="sr"></div>
         <div id="cart"></div>
 
@@ -455,10 +575,10 @@
             <select name="for_name" aria-label="Who is it for">
               ${pr.map(p => `<option>${esc(p.name)}</option>`).join('')}
             </select>
-            <button type="button" onclick="addp()">Add a person</button>
+            <button type="button" onclick="addp()">${t('add_person')}</button>
             <select name="payment" aria-label="Payment">
-              <option value="cod">Cash on delivery</option>
-              <option value="upi_test">UPI (test mode)</option>
+              <option value="cod">${t('cod')}</option>
+              <option value="upi_test">${t('upi_test')}</option>
             </select>
             <select name="area" aria-label="Delivery area">
               ${['Park Street', 'Salt Lake', 'Behala', 'Howrah'].map(a => `<option>${a}</option>`).join('')}
@@ -474,10 +594,10 @@
             </select>
             <button class="p">${t('send')}</button>
           </div>
-          <p class="mute">A pharmacist checks every prescription before anything is packed.</p>
+          <p class="mute">${t('rx_safety_note')}</p>
         </form>
 
-        ${nt.length ? `<h2>Messages</h2>${nt.map(n => `<div class="card mute">${esc(n.text)}</div>`).join('')}` : ''}
+        ${nt.length ? `<h2>${t('messages')}</h2>${nt.map(n => `<div class="card mute">${esc(n.text)}</div>`).join('')}` : ''}
 
         <h2>${t('orders')}</h2>
         ${os.length
@@ -488,7 +608,7 @@
                   ${pill(o.status)}
                 </div>
                 <div class="mute">
-                  For ${esc(o.for_name)}${o.store ? '. Store: ' + esc(o.store) : ''}${o.payment === 'upi_test' ? '. UPI (test mode): paid' : '. Pay on delivery'}
+                  ${t('for_lbl')} ${esc(o.for_name)}${o.store ? '. ' + t('store_lbl') + ': ' + esc(o.store) : ''}${o.payment === 'upi_test' ? '. ' + t('paid_upi') : '. ' + t('pay_delivery')}
                 </div>
                 ${o.note ? `<div class="${o.status === 'on_hold' ? 'bad' : 'mute'}">${esc(o.note)}</div>` : ''}
                 ${o.status === 'on_hold'
@@ -500,7 +620,7 @@
                         <option value="handwritten">Demo: handwritten</option>
                         <option value="blurry">Demo: blurry</option>
                       </select>
-                      <button class="p">Upload a new photo</button>
+                      <button class="p">${t('upload_new')}</button>
                     </form>`
                   : ''
                 }
@@ -509,16 +629,24 @@
                     ${esc(i.name)} × ${i.qty} ${i.status === 'rejected' ? `<span class="bad">(${esc(i.reason)})</span>` : ''}
                     ${i.offer_med && i.consent == null
                       ? `<div class="card">
-                          Your pharmacist suggests a cheaper generic: <b>${esc(i.offer_med.name)}</b> (₹${i.offer_med.price} instead of ₹${i.price}).
-                          <button class="p" onclick="act(()=>post('items/${i.id}/consent', {accept:true}), 'Generic accepted')">Accept</button>
-                          <button onclick="act(()=>post('items/${i.id}/consent', {accept:false}), 'Keeping the original')">Keep original</button>
+                          ${t('generic_offer')} <b>${esc(i.offer_med.name)}</b> (₹${i.offer_med.price} ${t('instead_of')} ₹${i.price}).
+                          <button class="p" onclick="act(()=>post('items/${i.id}/consent', {accept:true}), 'Generic accepted')">${t('accept')}</button>
+                          <button onclick="act(()=>post('items/${i.id}/consent', {accept:false}), 'Keeping the original')">${t('keep_original')}</button>
                         </div>`
+                      : ''
+                    }
+                    ${i.offer
+                      ? ` <span class="mute">${i.consent == null ? t('waiting_customer') : i.consent ? t('generic_accepted') : t('generic_kept')}</span>`
                       : ''
                     }
                   </div>`).join('')}
               </div>`).join('')
-          : '<div class="card mute">No orders yet. Upload a prescription to start.</div>'
-        }`;
+          : `<div class="card mute">${t('no_orders')}</div>`
+        }
+
+        <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--line)">
+          <button onclick="exportData()">${t('export_data')}</button>
+        </div>`;
       showc();
     }
 
@@ -562,7 +690,7 @@
       const getVal = name => document.querySelector('[name=' + name + ']').value;
       container.innerHTML = CART.length ? `
         <div class="card">
-          <b>Your cart</b>
+          <b>${t('cart_title')}</b>
           ${CART.map(c => `<div>${esc(c.name)} × ${c.qty} (₹${c.price * c.qty})</div>`).join('')}
           <div class="row" style="justify-content:flex-start;margin-top:8px">
             <button class="p" onclick="act(async () => {
@@ -573,8 +701,8 @@
                 lines: CART.map(c => ({ med_id: c.id, qty: c.qty }))
               });
               CART = [];
-            }, 'Order placed')">Place order</button>
-            <button onclick="CART=[];showc()">Clear</button>
+            }, 'Order placed')">${t('place_order')}</button>
+            <button onclick="CART=[];showc()">${t('clear_cart')}</button>
           </div>
         </div>` : '';
     }
@@ -767,12 +895,38 @@
     }
 
     function addp() {
-      const name = prompt('Name');
-      if (name) {
-        act(() => post('profiles', {
-          name,
-          relation: prompt('Relation, for example Mother', 'Family') || 'Family'
-        }), 'Added');
+      const name = prompt('Name:');
+      if (!name || !name.trim()) return;
+      const relation = prompt('Relation (e.g. Mother, Father, Child, Self):', 'Family') || 'Family';
+      const isMinor = confirm('Is this person under 18 years old?');
+      let guardianConsent = false;
+      if (isMinor) {
+        guardianConsent = confirm('As parent/guardian, do you consent to processing health and prescription data for this minor under DPDP Act?');
+        if (!guardianConsent) {
+          alert('Guardian consent is required to add an under-18 family profile.');
+          return;
+        }
+      }
+      act(() => post('profiles', {
+        name: name.trim(),
+        relation: relation.trim(),
+        is_minor: isMinor,
+        guardian_consent: guardianConsent
+      }), 'Added');
+    }
+
+    async function exportData() {
+      try {
+        const data = await api('me/export');
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `refillcare-data-${U.phone}.json`;
+        a.click();
+        toast('Data export ready');
+      } catch (err) {
+        toast(err.message);
       }
     }
 

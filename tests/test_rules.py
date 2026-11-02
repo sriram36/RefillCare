@@ -13,9 +13,13 @@ import rules as R
 c = TestClient(A.app)
 
 
-def H(phone: str) -> dict:
+def H(phone: str, consent: bool = True) -> dict:
     res = c.post("/api/login", json={"phone": phone, "otp": "123456"})
-    return {"Authorization": res.json()["token"]}
+    token = res.json()["token"]
+    headers = {"Authorization": token}
+    if consent and res.json().get("user", {}).get("role") == "customer":
+        c.post("/api/consent", headers=headers)
+    return headers
 
 
 def S(code: str, ph: dict) -> dict:
@@ -316,3 +320,129 @@ def test_reupload_linked_to_held_order():
     # Test wrong status (now awaiting_pharmacist, not on_hold) -> 409
     r_wrong_status = c.post(f"/api/orders/{code}/reupload", data={"demo": "clean"}, headers=cu1)
     assert r_wrong_status.status_code == 409
+
+
+def test_prescription_records_for_refills():
+    cu1 = H("9000000001")
+    cu2 = H("9000000002")
+    ph = H("9000000099")
+
+    # 1. Valid record attaches image to refill reorder and moves to awaiting_pharmacist
+    refills_cu1 = c.get("/api/refills", headers=cu1).json()
+    refill_mother = next(r for r in refills_cu1 if r["for_name"] == "Mother")
+    res_reorder = c.post(f"/api/refills/{refill_mother['id']}/reorder", headers=cu1)
+    assert res_reorder.status_code == 200
+    order_code = res_reorder.json()["code"]
+    assert res_reorder.json()["status"] == "awaiting_pharmacist"
+    assert "Prescription on file, valid until" in res_reorder.json()["note"]
+
+    # Verify that the prescription image was attached and can be viewed by the pharmacist
+    rx_res = c.get(f"/api/orders/{order_code}/rx", headers=ph)
+    assert rx_res.status_code == 200 and rx_res.content[:4] == b"\x89PNG"
+
+    # Pharmacist can approve because a valid record and image are attached
+    order = next(o for o in c.get("/api/orders", headers=ph).json() if o["code"] == order_code)
+    item_id = order["items"][0]["id"]
+    appr_res = c.post(f"/api/items/{item_id}/decide", json={"action": "approve"}, headers=ph)
+    assert appr_res.status_code == 200
+
+    # 2. Expired or missing record puts refill order on hold with "Please upload a current prescription"
+    refills_cu2 = c.get("/api/refills", headers=cu2).json()
+    refill_rina = refills_cu2[0]
+    res_expired = c.post(f"/api/refills/{refill_rina['id']}/reorder", headers=cu2)
+    assert res_expired.status_code == 200
+    expired_code = res_expired.json()["code"]
+    assert res_expired.json()["status"] == "on_hold"
+    assert "Please upload a current prescription" in res_expired.json()["note"]
+
+    # 3. Approval refused (422) if prescription-only item has no image and no valid record
+    expired_order = next(o for o in c.get("/api/orders", headers=ph).json() if o["code"] == expired_code)
+    expired_item_id = expired_order["items"][0]["id"]
+    refuse_res = c.post(f"/api/items/{expired_item_id}/decide", json={"action": "approve"}, headers=ph)
+    assert refuse_res.status_code == 422
+
+
+def test_dpdp_consent_and_minors():
+    # Customer 3 starts without consent
+    cu3_no_consent = H("9000000003", consent=False)
+
+    # 1. Orders and uploads return 403 CONSENT_REQUIRED until consent given
+    res_order = c.post("/api/orders", data={"for_name": "Arif Mondal", "demo": "clean"}, headers=cu3_no_consent)
+    assert res_order.status_code == 403
+    assert res_order.json()["detail"]["code"] == "CONSENT_REQUIRED"
+
+    res_cart = c.post(
+        "/api/cart",
+        json={"for_name": "Arif Mondal", "lines": [{"med_id": 7, "qty": 1}]},
+        headers=cu3_no_consent,
+    )
+    assert res_cart.status_code == 403
+    assert res_cart.json()["detail"]["code"] == "CONSENT_REQUIRED"
+
+    # 2. POST /api/consent records the timestamp
+    consent_res = c.post("/api/consent", headers=cu3_no_consent)
+    assert consent_res.status_code == 200
+    assert consent_res.json()["consent_at"] > 0
+
+    # 3. After consent given, ordering succeeds
+    res_order_ok = c.post("/api/orders", data={"for_name": "Arif Mondal", "demo": "clean"}, headers=cu3_no_consent)
+    assert res_order_ok.status_code == 200
+
+    # 4. Profiles under 18 require guardian consent
+    res_minor_fail = c.post(
+        "/api/profiles",
+        json={"name": "Child A", "relation": "Son", "is_minor": True, "guardian_consent": False},
+        headers=cu3_no_consent,
+    )
+    assert res_minor_fail.status_code == 422
+
+    res_minor_ok = c.post(
+        "/api/profiles",
+        json={"name": "Child A", "relation": "Son", "is_minor": True, "guardian_consent": True},
+        headers=cu3_no_consent,
+    )
+    assert res_minor_ok.status_code == 200
+
+    # 5. GET /api/me/export returns only own data
+    export_res = c.get("/api/me/export", headers=cu3_no_consent)
+    assert export_res.status_code == 200
+    data = export_res.json()
+    assert data["user"]["phone"] == "9000000003"
+    assert any(p["name"] == "Child A" for p in data["profiles"])
+    # Ensure other customer profiles/orders are not leaked
+    assert not any(p["name"] == "Mother" for p in data["profiles"])
+
+
+def test_signin_rate_limiting_and_logout():
+    test_phone = "9000000077"
+    # Seed or use test user
+    A.ex("insert or ignore into users(id, name, phone, role) values(77, 'RateLimit Test', '9000000077', 'customer')")
+
+    # 5 wrong attempts
+    for _ in range(5):
+        r = c.post("/api/login", json={"phone": test_phone, "otp": "999999"})
+        assert r.status_code == 401
+
+    # 6th attempt trips rate limit -> 429
+    r_locked = c.post("/api/login", json={"phone": test_phone, "otp": "123456"})
+    assert r_locked.status_code == 429
+    assert "Too many failed login attempts" in r_locked.json()["detail"]
+
+    # Reset rate limit tracker for clean state
+    A.reset_failed_login(test_phone)
+    login_res = c.post("/api/login", json={"phone": test_phone, "otp": "123456"})
+    assert login_res.status_code == 200
+    token = login_res.json()["token"]
+    headers = {"Authorization": token}
+
+    # Verify token works
+    assert c.get("/api/profiles", headers=headers).status_code == 200
+
+    # Logout bumps token version
+    logout_res = c.post("/api/logout", headers=headers)
+    assert logout_res.status_code == 200
+
+    # Old token is now rejected with 401
+    assert c.get("/api/profiles", headers=headers).status_code == 401
+
+

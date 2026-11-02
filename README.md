@@ -77,7 +77,7 @@ All accounts use the demo OTP: **`123456`**.
 ## Testing
 
 ```bash
-# Run backend safety gate & business rule tests (12 tests)
+# Run backend safety gate & business rule tests (16 tests)
 python -m pytest -q
 
 # Run frontend simulated DOM smoke tests (10 checks)

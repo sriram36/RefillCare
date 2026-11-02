@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, Response
 from PIL import Image, ImageDraw, ImageFilter
 from pydantic import BaseModel
 
-from rules import can_dispatch, route, rule
+from rules import RX_VALID_DAYS, can_dispatch, route, rule
 
 DB = os.getenv("DB_PATH", "pharmacy.db")
 SECRET = os.getenv("APP_SECRET", "dev-only-secret")
@@ -37,7 +37,7 @@ AREAS = {
 }  # sample coordinates
 
 SCHEMA = """
-create table users(id integer primary key, name, phone unique, role, store_id);
+create table users(id integer primary key, name, phone unique, role, store_id, consent_at, token_ver default 1);
 create table meds(id integer primary key, name, schedule, price, generic_of);
 create table stores(id integer primary key, name, lat, lng);
 create table stock(store_id, med_id, qty, primary key(store_id, med_id));
@@ -45,9 +45,10 @@ create table orders(code primary key, customer_id, for_name, status, store_id, r
 create table items(id integer primary key, order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason, offer, consent);
 create table refills(id integer primary key, customer_id, for_name, med_id, qty, per_day, last_filled);
 create table audit(ts, actor, action, entity);
-create table profiles(id integer primary key, customer_id, name, relation);
+create table profiles(id integer primary key, customer_id, name, relation, is_minor default 0, guardian_consent default 0);
 create table notes(customer_id, text, ts, day);
 create table register(order_code, item_id, prescriber, patient, qty, ts);
+create table prescriptions(id integer primary key, customer_id, profile_name, order_code, rx_file, approved_at, valid_until);
 """
 
 
@@ -190,31 +191,104 @@ def init():
         "update orders set created = ?, verified_at = ? where code = 'RX-50211'",
         (now - 900, now - 300),
     )
+    connection.execute(
+        "insert into prescriptions(customer_id, profile_name, order_code, rx_file, approved_at, valid_until) values(?, ?, ?, ?, ?, ?)",
+        (
+            1,
+            "Mother",
+            "RX-50211",
+            "RX-50211.enc",
+            date.today().isoformat(),
+            (date.today() + timedelta(days=RX_VALID_DAYS)).isoformat(),
+        ),
+    )
+    connection.commit()
+    connection.close()
+
+
+def ensure_schema():
+    connection = db()
+    connection.execute(
+        "create table if not exists prescriptions(id integer primary key, customer_id, profile_name, order_code, rx_file, approved_at, valid_until)"
+    )
+    for col, ddl in [
+        ("consent_at", "alter table users add column consent_at integer"),
+        ("token_ver", "alter table users add column token_ver integer default 1"),
+        ("is_minor", "alter table profiles add column is_minor integer default 0"),
+        ("guardian_consent", "alter table profiles add column guardian_consent integer default 0"),
+    ]:
+        try:
+            connection.execute(ddl)
+        except sqlite3.OperationalError:
+            pass
     connection.commit()
     connection.close()
 
 
 init()
+ensure_schema()
+
+FAILED_LOGINS: dict[str, list[float]] = {}
 
 
-def tok(uid: int, exp: int | None = None) -> str:
+def check_rate_limit(phone: str):
+    now = time.time()
+    window = 600  # 10 minutes
+    attempts = [t for t in FAILED_LOGINS.get(phone, []) if now - t < window]
+    FAILED_LOGINS[phone] = attempts
+    if len(attempts) >= 5:
+        raise HTTPException(
+            429,
+            "Too many failed login attempts. Please wait 10 minutes.",
+        )
+
+
+def record_failed_login(phone: str):
+    now = time.time()
+    window = 600
+    attempts = [t for t in FAILED_LOGINS.get(phone, []) if now - t < window]
+    attempts.append(now)
+    FAILED_LOGINS[phone] = attempts
+
+
+def reset_failed_login(phone: str):
+    FAILED_LOGINS.pop(phone, None)
+
+
+def tok(uid: int, token_ver: int = 1, exp: int | None = None) -> str:
     exp = exp or int(time.time()) + 43200  # 12 hour sessions
-    payload = f"{uid}.{exp}"
+    payload = f"{uid}.{token_ver}.{exp}"
     signature = hmac.new(SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:24]
-    return f"{uid}.{exp}.{signature}"
+    return f"{uid}.{token_ver}.{exp}.{signature}"
 
 
 def auth(authorization: str = Header("")):
     try:
-        uid, exp, sig = authorization.split(".")
+        parts = authorization.split(".")
+        if len(parts) == 3:
+            uid, exp, sig = parts
+            token_ver = 1
+            expected_sig = hmac.new(
+                SECRET.encode(), f"{uid}.{exp}".encode(), hashlib.sha256
+            ).hexdigest()[:24]
+        elif len(parts) == 4:
+            uid, token_ver_str, exp, sig = parts
+            token_ver = int(token_ver_str)
+            expected_sig = tok(int(uid), token_ver, int(exp)).split(".")[3]
+        else:
+            raise ValueError("Invalid token format")
+
         if int(exp) <= time.time():
             raise ValueError("Token expired")
-        expected_sig = tok(int(uid), int(exp)).split(".")[2]
         if not hmac.compare_digest(sig, expected_sig):
             raise ValueError("Invalid signature")
+
         user = q("select * from users where id = ?", int(uid), one=True)
         if not user:
             raise ValueError("User not found")
+        current_ver = user.get("token_ver") or 1
+        if int(token_ver) != current_ver:
+            raise ValueError("Token revoked")
         return user
     except Exception:
         raise HTTPException(401, "Sign in again")
@@ -225,6 +299,28 @@ def need(user: dict | None, role: str):
         raise HTTPException(403, "Not allowed for your role")
 
 
+def check_consent(u: dict):
+    if u.get("role") == "customer" and not u.get("consent_at"):
+        raise HTTPException(
+            403,
+            {"code": "CONSENT_REQUIRED", "message": "Consent is required to place or manage health orders"},
+        )
+
+
+def check_minor_guardian_consent(u: dict, for_name: str):
+    prof = q(
+        "select * from profiles where customer_id = ? and name = ?",
+        u["id"],
+        for_name.strip(),
+        one=True,
+    )
+    if prof and prof.get("is_minor") and not prof.get("guardian_consent"):
+        raise HTTPException(
+            422,
+            "Cannot place orders for a minor profile without recorded guardian consent",
+        )
+
+
 class Login(BaseModel):
     phone: str
     otp: str
@@ -232,10 +328,34 @@ class Login(BaseModel):
 
 @app.post("/api/login")
 def login(b: Login):
-    user = q("select * from users where phone = ?", b.phone.strip(), one=True)
+    phone = b.phone.strip()
+    check_rate_limit(phone)
+    user = q("select * from users where phone = ?", phone, one=True)
     if not user or b.otp != "123456":
+        record_failed_login(phone)
         raise HTTPException(401, "Wrong phone or OTP (demo OTP is 123456)")
-    return {"token": tok(user["id"]), "user": user}
+    reset_failed_login(phone)
+    token_ver = user.get("token_ver") or 1
+    return {"token": tok(user["id"], token_ver), "user": user}
+
+
+@app.post("/api/logout")
+def logout(u=Depends(auth)):
+    ex(
+        "update users set token_ver = coalesce(token_ver, 1) + 1 where id = ?",
+        u["id"],
+    )
+    log(u["name"], "logout", f"user {u['id']}")
+    return {"ok": True}
+
+
+@app.post("/api/consent")
+def give_consent(u=Depends(auth)):
+    need(u, "customer")
+    now = int(time.time())
+    ex("update users set consent_at = ? where id = ?", now, u["id"])
+    log(u["name"], "grant_consent", str(now))
+    return {"ok": True, "consent_at": now}
 
 
 # ---- AI prescription reading: draft only ----
@@ -352,6 +472,8 @@ async def new_order(
     u=Depends(auth),
 ):
     need(u, "customer")
+    check_consent(u)
+    check_minor_guardian_consent(u, for_name)
     raw = await file.read() if file else demo_png(demo)
     if not raw:
         raise HTTPException(400, "Add a prescription photo or pick a demo prescription")
@@ -450,6 +572,7 @@ async def reupload_rx(
     u=Depends(auth),
 ):
     need(u, "customer")
+    check_consent(u)
     o = q("select * from orders where code = ?", code, one=True)
     if not o:
         raise HTTPException(404, "Order not found")
@@ -625,6 +748,10 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
     if not item:
         raise HTTPException(404, "Item not found")
 
+    order = q("select * from orders where code = ?", item["order_code"], one=True)
+    if not order:
+        raise HTTPException(404, "Order not found")
+
     if d.action == "reject":
         if not d.reason.strip():
             raise HTTPException(422, "A reason is required to reject")
@@ -641,6 +768,54 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
         qty = d.qty if d.qty is not None else item["qty"]
         if not 1 <= qty <= 50:
             raise HTTPException(422, "Quantity must be 1 to 50")
+
+        # Step 2: Prescription validation for prescription-only (Rx) items
+        if rule(item["schedule"])["rx"]:
+            today_str = date.today().isoformat()
+            has_order_file = bool(order["rx_file"] and os.path.exists(f"{STORE}/{order['rx_file']}"))
+            valid_record = q(
+                "select * from prescriptions where customer_id = ? and profile_name = ? and valid_until >= ? order by valid_until desc limit 1",
+                order["customer_id"],
+                order["for_name"],
+                today_str,
+                one=True,
+            )
+            if not has_order_file and not valid_record:
+                raise HTTPException(
+                    422,
+                    "Prescription-only medicine cannot be approved without an uploaded prescription or a valid prescription record on file",
+                )
+
+            # Store or refresh prescription record if order has an uploaded image
+            if has_order_file:
+                approved_at = today_str
+                valid_until = (date.today() + timedelta(days=RX_VALID_DAYS)).isoformat()
+                existing_rx = q(
+                    "select id from prescriptions where customer_id = ? and profile_name = ?",
+                    order["customer_id"],
+                    order["for_name"],
+                    one=True,
+                )
+                if existing_rx:
+                    ex(
+                        "update prescriptions set order_code = ?, rx_file = ?, approved_at = ?, valid_until = ? where id = ?",
+                        order["code"],
+                        order["rx_file"],
+                        approved_at,
+                        valid_until,
+                        existing_rx["id"],
+                    )
+                else:
+                    ex(
+                        "insert into prescriptions(customer_id, profile_name, order_code, rx_file, approved_at, valid_until) values(?, ?, ?, ?, ?, ?)",
+                        order["customer_id"],
+                        order["for_name"],
+                        order["code"],
+                        order["rx_file"],
+                        approved_at,
+                        valid_until,
+                    )
+
         if item["schedule"] == "H1":
             if not d.prescriber.strip() or not d.patient.strip():
                 raise HTTPException(
@@ -748,6 +923,7 @@ def refills(u=Depends(auth)):
 @app.post("/api/refills/{rid}/reorder")
 def reorder(rid: int, u=Depends(auth)):
     need(u, "customer")
+    check_consent(u)
     r = q(
         "select * from refills where id = ? and customer_id = ?",
         rid,
@@ -757,19 +933,41 @@ def reorder(rid: int, u=Depends(auth)):
     if not r:
         raise HTTPException(404, "Refill not found")
 
+    check_minor_guardian_consent(u, r["for_name"])
     m = q("select * from meds where id = ?", r["med_id"], one=True)
     order_count = q("select count(*) n from orders", one=True)["n"]
     code = f"RX-{50220 + order_count}"
+
+    today_str = date.today().isoformat()
+    valid_rx = q(
+        "select * from prescriptions where customer_id = ? and profile_name = ? and valid_until >= ? order by valid_until desc limit 1",
+        u["id"],
+        r["for_name"],
+        today_str,
+        one=True,
+    )
+
+    if valid_rx and valid_rx["rx_file"] and os.path.exists(f"{STORE}/{valid_rx['rx_file']}"):
+        import shutil
+
+        rx_file = f"{code}.enc"
+        shutil.copyfile(f"{STORE}/{valid_rx['rx_file']}", f"{STORE}/{rx_file}")
+        status = "awaiting_pharmacist"
+        note = f"Prescription on file, valid until {valid_rx['valid_until']}"
+    else:
+        rx_file = None
+        status = "on_hold"
+        note = "Please upload a current prescription"
 
     ex(
         "insert into orders(code, customer_id, for_name, status, store_id, rx_file, note, created) values(?, ?, ?, ?, ?, ?, ?, ?)",
         code,
         u["id"],
         r["for_name"],
-        "awaiting_pharmacist",
+        status,
         None,
-        None,
-        "Refill. Pharmacist still checks the prescription.",
+        rx_file,
+        note,
         int(time.time()),
     )
     ex(
@@ -786,7 +984,7 @@ def reorder(rid: int, u=Depends(auth)):
         "",
     )
     log(u["name"], "reorder", code)
-    return {"code": code}
+    return {"code": code, "status": status, "note": note}
 
 
 @app.post("/api/items/{iid}/offer-generic")
@@ -933,6 +1131,8 @@ class Cart(BaseModel):
 def cart(b: Cart, u=Depends(auth)):
     # over-the-counter items only; anything else must go through a prescription
     need(u, "customer")
+    check_consent(u)
+    check_minor_guardian_consent(u, b.for_name)
     if not 1 <= len(b.lines) <= 10:
         raise HTTPException(422, "Add 1 to 10 items")
 
@@ -1017,6 +1217,8 @@ def get_profiles(u=Depends(auth)):
 class Profile(BaseModel):
     name: str
     relation: str = "Family"
+    is_minor: bool = False
+    guardian_consent: bool = False
 
 
 @app.post("/api/profiles")
@@ -1025,6 +1227,9 @@ def add_profile(b: Profile, u=Depends(auth)):
     name = b.name.strip()[:60]
     if not name:
         raise HTTPException(422, "Enter a name")
+
+    if b.is_minor and not b.guardian_consent:
+        raise HTTPException(422, "Guardian consent is required for profiles under 18")
 
     if q(
         "select 1 x from profiles where customer_id = ? and name = ?",
@@ -1035,12 +1240,41 @@ def add_profile(b: Profile, u=Depends(auth)):
         raise HTTPException(409, "This person is already added")
 
     ex(
-        "insert into profiles(customer_id, name, relation) values(?, ?, ?)",
+        "insert into profiles(customer_id, name, relation, is_minor, guardian_consent) values(?, ?, ?, ?, ?)",
         u["id"],
         name,
         b.relation.strip()[:30],
+        1 if b.is_minor else 0,
+        1 if b.guardian_consent else 0,
     )
     return {"ok": True}
+
+
+@app.get("/api/me/export")
+def export_my_data(u=Depends(auth)):
+    need(u, "customer")
+    my_orders = q(
+        "select * from orders where customer_id = ? order by created desc, code desc",
+        u["id"],
+    )
+    for o in my_orders:
+        o["items"] = q("select * from items where order_code = ?", o["code"])
+    my_profiles = q("select * from profiles where customer_id = ?", u["id"])
+    my_notes = q("select * from notes where customer_id = ? order by ts desc", u["id"])
+    my_prescriptions = q("select * from prescriptions where customer_id = ?", u["id"])
+    return {
+        "user": {
+            "id": u["id"],
+            "name": u["name"],
+            "phone": u["phone"],
+            "role": u["role"],
+            "consent_at": u.get("consent_at"),
+        },
+        "profiles": my_profiles,
+        "orders": my_orders,
+        "notes": my_notes,
+        "prescriptions": my_prescriptions,
+    }
 
 
 @app.get("/api/notes")
