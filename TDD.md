@@ -9,6 +9,8 @@ FastAPI + SQLite, one service, plain HTML/JS front end. Chosen so the whole core
 users (role), meds (schedule, price), stores, stock (from a daily CSV), orders (state), items (schedule snapshot, confidence, approved_by, reason), refills (quantity, per-day dose, last filled), audit (every upload, view, decision, blocked attempt).
 
 ## 3. Main flows
+Roles: customer; pharmacist (verifies, offers generics, sees prescriptions and the dashboard); store staff (one account per store, sees only that store's orders, never prescriptions, packs and hands over). Separating them means the person who packs is not the person who approves.
+
 Customer uploads or reorders, then AI draft, then pharmacist approves, edits quantity or rejects with a reason, then routing to the nearest store holding every approved line, then pack, then hand to delivery. Order states: awaiting_pharmacist, on_hold, approved, packed, dispatched, rejected.
 **The gate:** `can_dispatch()` runs on every pack and dispatch call, in the backend. Any prescription-only line that is not approved by a pharmacist blocks the order (HTTP 403). Restricted schedules (X, narcotic) are refused when the order is created. Unknown schedules are treated as prescription-only. Rules are a config table in `rules.py`.
 
@@ -34,4 +36,4 @@ Customer: one large Reorder button, refills first, no promotions. Pharmacist: qu
 Built beyond the core: generic substitutes (pharmacist offers, customer consents, dispatch blocked until answered), H1 register, central dashboard, store invoice number, daily stock CSV upload, family profiles, UPI (test mode) and cash on delivery, routing from a chosen delivery area, refill reminders as in-app messages (a mock of the daily job), 12-hour sessions, English/Bengali/Hindi on the customer home.
 Not built: real payment gateway, real SMS/WhatsApp sending, customer street addresses and map pins, store-staff role separate from the pharmacist, search across the full catalog (the demo catalog is small), accuracy measurement on real handwritten prescriptions.
 Limits: live Azure OpenAI reading is coded but untested against a real key; Bengali and Hindi strings need a native speaker's review and cover only the customer home; SQLite is single-writer; delivery areas use sample coordinates.
-Next: Postgres, translations for every screen, a golden set of real prescription images with measured accuracy, real notifications, a separate store-staff role.
+Next: Postgres, translations for every screen, a golden set of real prescription images with measured accuracy, real notifications.

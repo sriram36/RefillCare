@@ -20,13 +20,14 @@ Without the Azure variables the app uses the four built-in demo prescriptions; a
 | Customer (Debasish) | 9000000001 |
 | Customer (Rina) | 9000000002 |
 | Pharmacist | 9000000099 |
+| Store staff, Salt Lake / Behala / Howrah | 9000000081 / 9000000082 / 9000000083 |
 
 ## Three-minute tour
 1. Sign in as Debasish. "Running low" shows Metformin with about 4 days left. Press Reorder.
 2. Upload a demo prescription ("clear printed").
 3. Sign in as the pharmacist. Open the new order. The prescription image is beside the matched lines.
-4. Press Pack before approving. It is blocked with the reason.
-5. Approve both lines (the order is routed to the nearest store with stock), then Pack and Hand to delivery.
+4. Prove the gate: sign in as Store staff, Behala (9000000082). RX-50214 shows "Waiting for pharmacist approval". Through the API docs at `/docs`, `POST /api/orders/RX-50214/pack` with `{"invoice":"X1"}` returns 403 APPROVAL_REQUIRED.
+5. Approve both lines as the pharmacist. The order is routed to the nearest store with stock (Howrah for Park Street). Sign in as Store staff, Howrah: Pack with an invoice number, then Hand to delivery.
 6. As the customer, upload "blurry" (asks for a new photo) and "restricted item" (the restricted line is refused).
 
 ## More to try
