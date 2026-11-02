@@ -1,6 +1,6 @@
 # Technical Design Document: Pharmacy reorder (core build)
 
-GitHub: <add your repo URL>  ·  Live app: <add URL if deployed>
+GitHub: https://github.com/sriram36/RefillCare.git  ·  Live app: <add URL if deployed>
 
 ## 1. Architecture and why
 FastAPI + SQLite, one service, plain HTML/JS front end. Chosen so the whole core slice runs with one command and a reviewer can try it with no setup. Business rules live in `rules.py` (no DB, easy to test). Postgres and Next.js are the next step, not a different design.
