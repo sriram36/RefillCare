@@ -495,3 +495,4 @@ async function storeView() {
       </div>`).join('') || '<div class="card mute">No orders for your store yet.</div>'
     }`;
 }
+

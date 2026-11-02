@@ -6,4 +6,10 @@ rx_store/
 .venv
 *.pdf
 *.zip
-node_modules
+node_modules/
+.next/
+out/
+build/
+dist/
+.DS_Store
+*.log

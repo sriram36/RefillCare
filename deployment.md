@@ -1,54 +1,169 @@
-# Deployment
+# RefillCare Deployment & Operations Guide
 
-## Run locally
-1. `python -m venv .venv && source .venv/bin/activate`
-2. `pip install -r requirements.txt`
-3. `uvicorn app:app --reload`  (the SQLite database and sample data are created on first start)
-4. Open http://localhost:8000
-5. Tests: `python -m pytest -q`
+RefillCare is an end-to-end pharmacy reorder and verification system built for a 46-store chain across Kolkata and Howrah.
+It features a dedicated **Next.js 14 App Router frontend** and a high-performance **FastAPI backend** with DPDP Act encryption, Drugs & Cosmetics Act Schedule H/H1 regulatory gates, and automated stock routing.
 
-## Deploy
-Any host that runs a Python web service (Render, Railway, Fly). Start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`. Use a persistent disk for `pharmacy.db` and `rx_store/`.
+---
 
-The live demo runs on a free instance. The first load can take about a minute, and orders reset when it restarts. Sample data is recreated automatically.
+## 1. System Architecture
 
-## Environment variables (names only)
-`APP_SECRET`, `RX_ENC_KEY` (Fernet key), `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_KEY`, `AZURE_OPENAI_DEPLOYMENT`, `DB_PATH` (optional).
-Without the Azure variables the app uses the four built-in demo prescriptions; any other upload goes to the pharmacist for manual reading.
+```
++-------------------------------------------------------------+
+|             Frontend (Next.js 14 + Tailwind CSS)           |
+|  - Customer Portal: 1-Tap Refills, Prescription OCR draft  |
+|  - Pharmacist Verification: Side-by-Side Review, H1 Reg     |
+|  - Store Fulfillment: Hard Regulatory Gate, Pack & Dispatch |
+|  - Central Dashboard: 46-Store SLA Tracker, Stock CSV       |
+|  Hosted on: Vercel or Render Static Site                    |
++-------------------------------------------------------------+
+                               |
+                        HTTP / JSON API
+                     (CORS Authenticated)
+                               v
++-------------------------------------------------------------+
+|                Backend API (FastAPI + Python 3.12)          |
+|  - Fernet AES-128 Encryption for Prescriptions              |
+|  - Automated 46-Store Stock Routing Engine                  |
+|  - DPDP Act 2023 Access Logs & Minor Consent Protection     |
+|  - Automated Startup Database Seeding                       |
+|  Hosted on: Render Web Service (Docker)                     |
++-------------------------------------------------------------+
+```
 
-## Demo logins (OTP for all: 123456)
-| Role | Phone |
-|---|---|
-| Customer (Debasish) | 9000000001 |
-| Customer (Rina) | 9000000002 |
-| Pharmacist | 9000000099 |
-| Store staff, Salt Lake / Behala / Howrah | 9000000081 / 9000000082 / 9000000083 |
+---
 
-## Three-minute tour
-1. Sign in as Debasish. "Running low" shows Metformin with about 4 days left. Press Reorder.
-2. Upload a demo prescription ("clear printed").
-3. Sign in as the pharmacist. Open the new order. The prescription image is beside the matched lines.
-4. Prove the gate: sign in as Store staff, Behala (9000000082). RX-50214 shows "Waiting for pharmacist approval". Through the API docs at `/docs`, `POST /api/orders/RX-50214/pack` with `{"invoice":"X1"}` returns 403 APPROVAL_REQUIRED.
-5. Approve both lines as the pharmacist. The order is routed to the nearest store with stock (Howrah for Park Street). Sign in as Store staff, Howrah: Pack with an invoice number, then Hand to delivery.
-6. As the customer, upload "blurry" (asks for a new photo) and "restricted item" (the restricted line is refused).
+## 2. Docker & Automated Seed Data Loading
 
-## More to try
-7. Upload "controlled (H1)". Approving it asks for prescriber and patient name; the entry appears under Dashboard, H1 register.
-8. Approve a Metformin line, press "Offer cheaper generic", then sign in as the customer and accept it. Pack is blocked until they answer.
-9. Dashboard shows orders by store, median verification time and rejections. Upload `data/stock.csv` to refresh stock.
-10. Switch the language (top right) to Bengali or Hindi on the customer home.
-11. Press "Add a person" on the customer home, then upload a prescription for them. Pick UPI (test mode) or cash on delivery, and a delivery area.
-12. As the pharmacist, Dashboard, "Send today's reminders". The customer sees the message on their home screen.
+### How Seed Data Loads Automatically in Docker
+The Docker container automatically seeds the database on startup:
+1. `pharmacy.db` and `rx_store/` are excluded from the Docker build via `.dockerignore`.
+2. When the Docker container starts, `app.py` runs `init()`.
+3. Seeing that no database exists on the first boot, `init()`:
+   - Creates all tables (`SCHEMA`).
+   - Seeds all **46 stores** across Kolkata & Howrah.
+   - Seeds regular patients: **Debasish Ghosh** (diabetes / Metformin), **Rina Sen** (blood pressure / Telmisartan), and **Arif Mondal** (thyroid / Levothyroxine).
+   - Seeds store staff and registered pharmacist Anita Rao.
+   - Seeds all medicines (Schedule H, Schedule H1, Generics, OTC, and restricted Schedule X/Narcotics blocklist).
+   - Seeds store inventory across all stores.
+   - Calls `seed_images()` to generate and encrypt initial synthetic sample prescriptions (`RX-50211`, `RX-50214`, `RX-50219`).
 
-## Docker
-`docker build -t pharmacy-reorder . && docker run -p 8000:8000 -e APP_SECRET=change-me pharmacy-reorder`
+### Running via Docker Locally
+```bash
+# Build the Docker image
+docker build -t refillcare-backend .
 
-## Accuracy check (needs your Azure key)
-Put labelled images in a folder, copy `eval/labels.example.json`, then `python eval/run_eval.py <folder> <labels.json>`.
+# Run the container (bind to port 8000)
+docker run -p 8000:8000 -e APP_SECRET=your-secure-secret refillcare-backend
+```
 
-## UI smoke test
-With the app running: `npm i jsdom && BASE=http://localhost:8000/ node tests/ui_smoke.js`
+Open `http://localhost:8000/docs` to explore the OpenAPI documentation.
 
-## Publish
-`git remote add origin https://github.com/sriram36/<repo>.git && git push -u origin main` (keep the repo public until review ends).
-13. As a customer, search "para": Paracetamol can be added to the cart and ordered (no prescription needed). Search "metformin": it says it needs a prescription. Search "demo": the restricted items say "Not sold online".
+---
+
+## 3. Deploying the Backend to Render
+
+### Option A: Via Docker (Pre-configured `Dockerfile`)
+1. Go to [Render Dashboard](https://dashboard.render.com/) -> **New** -> **Web Service**.
+2. Connect your GitHub repository: `sriram36/RefillCare`.
+3. Configure the service:
+   - **Name:** `refillcare` (or `refillcare-backend`)
+   - **Region:** Singapore or Oregon
+   - **Branch:** `main`
+   - **Root Directory:** Leave empty (root)
+   - **Environment / Language:** `Docker`
+   - **Plan:** Free ($0/month) or Starter ($7/month)
+4. **Environment Variables:**
+   - `APP_SECRET`: e.g. `rfcare-kolkata-prod-2026-secret`
+   - `RX_ENC_KEY`: (optional, auto-generated if omitted)
+   - `AZURE_OPENAI_ENDPOINT`: (optional for live OCR)
+   - `AZURE_OPENAI_KEY`: (optional)
+   - `AZURE_OPENAI_DEPLOYMENT`: (optional)
+5. Click **Create Web Service**.
+6. Render builds the Docker image and starts the server on `https://refillcare.onrender.com`.
+
+---
+
+## 4. Deploying the Next.js Frontend
+
+The modern frontend is located in `/frontend`. It can be deployed to **Vercel** or **Render Static Site**.
+
+### Deploying on Vercel (Recommended for Next.js)
+1. Go to [Vercel Dashboard](https://vercel.com/new).
+2. Import repository `sriram36/RefillCare`.
+3. Configure Project Settings:
+   - **Framework Preset:** Next.js
+   - **Root Directory:** Select `frontend` (or click Edit and select `frontend`).
+4. **Environment Variables:**
+   - Name: `NEXT_PUBLIC_API_URL`
+   - Value: `https://refillcare.onrender.com`
+5. Click **Deploy**.
+   Vercel will compile the Next.js App Router project and assign a custom URL (e.g. `https://refillcare-frontend.vercel.app`).
+
+### Deploying on Render (Static Site)
+1. On Render Dashboard -> **New** -> **Static Site**.
+2. Select repository `sriram36/RefillCare`.
+3. Set:
+   - **Root Directory:** `frontend`
+   - **Build Command:** `npm run build`
+   - **Publish Directory:** `out` (or configure Web Service with `npm run start`)
+   - **Environment Variable:** `NEXT_PUBLIC_API_URL=https://refillcare.onrender.com`
+
+---
+
+## 5. Local Development Workflow
+
+### Running Backend (Terminal 1)
+```bash
+python -m venv .venv
+# Windows:
+.\.venv\Scripts\activate
+# Mac/Linux:
+source .venv/bin/activate
+
+pip install -r requirements.txt
+uvicorn app:app --reload --port 8000
+```
+
+### Running Frontend (Terminal 2)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open `http://localhost:3000` in your browser.
+
+---
+
+## 6. Pre-seeded Demo Logins
+
+All accounts use the demo OTP: `123456`
+
+| Persona | Name / Store | Phone | Primary Role / Action |
+|---|---|---|---|
+| **Customer** | Debasish Ghosh | `9000000001` | 1-tap reorder (Metformin for Mother, 4 days left) |
+| **Customer** | Rina Sen | `9000000002` | Telmisartan refill, generic substitute consent |
+| **Customer** | Arif Mondal | `9000000003` | Levothyroxine (prescription re-upload on hold) |
+| **Pharmacist** | Anita Rao | `9000000099` | Verification queue, Schedule H1 approval, Generics |
+| **Store Staff** | Salt Lake Store | `9000000081` | Fulfillment, invoice generation, courier dispatch |
+| **Store Staff** | Behala Store | `9000000082` | Proves regulatory gate (dispatch blocked) |
+| **Store Staff** | Howrah Store | `9000000083` | Routed store fulfillment |
+
+---
+
+## 7. Verification & Smoke Testing
+
+### Backend Unit & Integration Tests (20/20)
+```bash
+python -m pytest -q
+```
+
+### Frontend Production Build
+```bash
+cd frontend
+npm run build
+```
+
+### End-to-End JSDOM Smoke Test
+```bash
+node tests/ui_smoke.js
+```

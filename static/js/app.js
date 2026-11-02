@@ -70,3 +70,4 @@ async function render() {
 
 // Initial application boot
 render();
+

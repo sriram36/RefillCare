@@ -4,4 +4,7 @@ rx_store
 __pycache__
 .env
 .venv
-
+frontend/node_modules
+frontend/.next
+frontend/out
+node_modules

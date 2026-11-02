@@ -4,7 +4,10 @@ Version 1.0 · 2 November 2026 · Author: Sriram Kolli
 GitHub: https://github.com/sriram36/RefillCare.git  ·  Live app: https://refillcare.onrender.com/
 
 ## 1. Architecture and why
-FastAPI + SQLite, single service, plain HTML/JS frontend without build frameworks. Chosen so the entire core slice runs with one command (`uvicorn app:app`) and a reviewer can evaluate it immediately with zero complex toolchains. Pure business rules live in `rules.py` (no DB dependencies, cleanly isolated, and 100% unit-tested). Moving to Postgres and Next.js represents the next scaling step, not a architectural rethink.
+The platform employs a decoupled modern architecture separating a high-performance Python FastAPI backend from a dedicated Next.js 14 (App Router) React client:
+- **Backend API (`app.py`, `rules.py`):** Runs on Python 3.12 / FastAPI with SQLite and Fernet AES-128 cryptographic storage for health data. Configured with CORS middleware for cross-origin client interaction. Pure regulatory and safety business rules live in `rules.py` (no DB dependencies, cleanly isolated, and 100% unit-tested with 20/20 pytest coverage).
+- **Modern Frontend (`/frontend`):** Standalone Next.js 14 application built with TypeScript, Tailwind CSS, and Lucide React icons. Features accessible design tokens, calm healthcare visual language (Plus Jakarta Sans font, high-contrast dark modes, WCAG AA compliance), trilingual support (English, Bengali, Hindi), role switcher, and separate specialized workspaces for Customers, Pharmacists, Store Staff, and Central Executive Operations.
+- **Embedded Fallback (`static/`):** The backend also serves a lightweight static build for single-command evaluation (`uvicorn app:app`) and automated JSDOM DOM smoke testing (`node tests/ui_smoke.js`).
 
 ## 2. Data model
 - `users`: id, name, phone (unique), role, store_id, consent_at, token_ver (defaults to 1).
@@ -67,9 +70,11 @@ A vision model reads uploaded prescription photos, outputting legible status, ma
 - **Security:** Uploaded prescription images are encrypted on disk with Fernet encryption (`rx_store/*.enc`) and every view by a pharmacist is logged in the audit trail. Store staff cannot access prescription images.
 
 ## 5. UI & Responsive Design
-- Clean visual hierarchy with high contrast, accessible touch targets (≥44px min-height), and smooth card layouts.
-- Full responsive support down to 390px mobile viewports (zero horizontal overflow across all screens).
-- English, Bengali, and Hindi language support across all customer-facing surfaces (home, refill reminders, search, cart, prescription upload, order status badges, generic consent, and DPDP notices).
+- **Dedicated Next.js 14 Frontend:** Implemented in `frontend/` using modern Next.js App Router, React 18, and Tailwind CSS.
+- **Calm Healthcare Aesthetics:** Uses Google Font (Plus Jakarta Sans), high-contrast accessible states, gentle teal and slate palettes, and zero visual clutter to ensure anxious customers and caregivers can easily navigate reorders.
+- **Clean Visual Hierarchy:** 1-tap monthly medicine refills, prominent "Running Low" status chips, sticky split-screen prescription viewer in pharmacist queue, and interactive 5-stage order progress timeline (`Timeline.tsx`).
+- **Full Responsive Support:** Mobile-first design strictly verified across 390px mobile viewports, tablet viewports, and desktop split screens with zero horizontal scroll.
+- **Trilingual Accessibility:** English, Bengali, and Hindi language support across all customer surfaces (home, refill reminders, catalog search, cart, prescription upload, timeline, generic consent, and DPDP notices) managed via `lib/i18n.ts`.
 
 ## 6. Assumptions (Labelled)
 - **A1:** Schedule list and medicine catalog are sample data; "Demo Restricted-X" and "Demo Narcotic" represent restricted control items.

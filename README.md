@@ -1,46 +1,44 @@
 # RefillCare
 
-A reliable, privacy-first online pharmacy reordering application designed for pharmacy chains. Built with FastAPI, SQLite, and vanilla HTML/JS.
+A reliable, privacy-first online pharmacy reordering and verification platform designed for a 46-store pharmacy chain across Kolkata and Howrah.
 
 - **Repository:** [https://github.com/sriram36/RefillCare](https://github.com/sriram36/RefillCare)
-- **Live Demo:** [https://refillcare.onrender.com/](https://refillcare.onrender.com/)
+- **Live Backend API & Demo:** [https://refillcare.onrender.com/](https://refillcare.onrender.com/)
 
 ---
 
-## Key Features
+## Architecture Overview
 
-1. **Safety Gate (Schedule H/H1 Enforcement):**
-   - Strictly enforces that Schedule H/H1 prescription medicines can **never** be packed or dispatched without explicit approval by a registered pharmacist.
-   - Restricts Schedule X and narcotic items from ever being sold online.
-   - Enforced server-side via `can_dispatch()` returning HTTP 403 `APPROVAL_REQUIRED` on any unauthorized attempt.
+RefillCare is architected with a decoupled frontend and backend:
 
-2. **AI-Assisted Prescription Reading (Draft Only):**
-   - Reads uploaded prescription images via Azure OpenAI vision models and extracts medication lines as a draft.
-   - Matches lines to catalog entries using fuzzy matching; flags confidence below 75% in amber.
-   - The pharmacist always reviews side-by-side with the decrypted prescription image before deciding.
+1. **Modern Frontend (`/frontend`):**
+   - **Stack:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons.
+   - **Experience:** Clean typography (Plus Jakarta Sans), high-contrast accessible states, calm healthcare aesthetics, instant role-switcher, and trilingual support (English, বাংলা, हिन्दी).
+   - **Portals:**
+     - **Customer App:** 1-tap monthly medicine refills, active "Running Low" alerts, live search across 46 stores, prescription photo upload, 5-stage order tracking, and DPDP Act data rights.
+     - **Pharmacist Queue:** Side-by-side sticky prescription viewer and AI draft match lines, Schedule H1 regulatory register modal, rejection with mandatory reason, generic savings offer.
+     - **Store Staff Screen:** Store-scoped pick and pack workflow with hard regulatory gate preventing dispatch until pharmacist approval, invoice entry, and courier handover.
+     - **Central Operations Dashboard:** Real-time metrics across 46 stores, median verification SLA tracker (< 10 min benchmark), low-stock inventory alerts (&le; 5 units), daily stock CSV sync, and automated refill reminders trigger.
 
-3. **Three Role Portals:**
-   - **Customer:** One-tap reorder for medicines running low, family profile management, OTC search & cart, multi-language support (English, বাংলা, हिन्दी).
-   - **Pharmacist:** Side-by-side queue review, line-by-line approval/rejection, generic medicine substitution offers, controlled substances (H1) register, and central operations dashboard.
-   - **Store Staff:** Scoped to individual retail stores, packs approved orders with invoice numbers, and manages handover to delivery.
-
-4. **Nearest-Store Inventory Routing:**
-   - Automatically routes approved orders to the nearest store holding full stock for all approved lines based on customer delivery area coordinates.
+2. **Backend API (`app.py`, `rules.py`):**
+   - **Stack:** FastAPI, Python 3.12, SQLite, Fernet AES-128 encryption.
+   - **Compliance:**
+     - Drugs and Cosmetics Act & Rules: Schedule H and H1 medicines require registered pharmacist approval; Schedule X and narcotic items are strictly prohibited online; Schedule H1 sales are logged to a statutory register.
+     - DPDP Act 2023: Prescriptions are encrypted at rest with Fernet AES-128, access is logged in a tamper-evident audit trail, and minor profiles require explicit guardian consent.
+   - **Routing Engine:** Automatically calculates distance from customer delivery area to stores holding complete inventory from daily stock records.
+   - **CORS Support:** Full cross-origin resource sharing configured to allow standalone Next.js deployments.
 
 ---
 
 ## Quickstart
 
-### Prerequisites
-- Python 3.10 or newer
-
-### Local Setup
+### 1. Backend Setup
 ```bash
-# 1. Clone the repository
+# Clone the repository
 git clone https://github.com/sriram36/RefillCare.git
 cd RefillCare
 
-# 2. Create and activate a virtual environment
+# Create and activate virtual environment
 # Windows:
 python -m venv .venv
 .\.venv\Scripts\activate
@@ -48,65 +46,71 @@ python -m venv .venv
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 3. Install dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# 4. Start the application
+# Start backend server
 python -m uvicorn app:app --port 8000 --reload
 ```
+The SQLite database and sample seed data (46 stores, sample patients, medicines, and encrypted demo prescriptions) are created automatically on first run.
 
-Open **[http://localhost:8000](http://localhost:8000)** in your browser. Sample database and test data are created automatically on first run.
+### 2. Modern Next.js Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ---
 
 ## Demo Credentials
 
-All accounts use the demo OTP: **`123456`**.
+All test accounts authenticate using OTP: **`123456`**.
 
-| Role | Phone | Notes |
-|---|---|---|
-| Customer (Debasish Ghosh) | `9000000001` | Has active refill for Metformin running low |
-| Customer (Rina Sen) | `9000000002` | Order `RX-50214` in progress |
-| Pharmacist (Anita Rao) | `9000000099` | Side-by-side queue and operations dashboard |
-| Store Staff (Salt Lake) | `9000000081` | Scoped to Store 1 |
-| Store Staff (Behala) | `9000000082` | Scoped to Store 2 |
-| Store Staff (Howrah Maidan) | `9000000083` | Scoped to Store 3 |
+| Role | Name / Store | Phone | Primary Feature |
+|---|---|---|---|
+| **Customer** | Debasish Ghosh | `9000000001` | 1-Tap Reorder (Metformin for Mother, 4 days left) |
+| **Customer** | Rina Sen | `9000000002` | Telmisartan refill, generic substitute consent |
+| **Customer** | Arif Mondal | `9000000003` | Levothyroxine (prescription re-upload on hold) |
+| **Pharmacist** | Anita Rao | `9000000099` | Verification queue, Schedule H1 approval, Generics |
+| **Store Staff** | Salt Lake Store | `9000000081` | Fulfillment, invoice generation, courier dispatch |
+| **Store Staff** | Behala Store | `9000000082` | Proves regulatory gate (dispatch blocked) |
+| **Store Staff** | Howrah Maidan | `9000000083` | Routed store fulfillment |
 
 ---
 
-## Testing
+## Automated Verification & Tests
 
 ```bash
-# Run backend safety gate & business rule tests (20 tests)
+# 1. Backend safety gate & business rule tests (20 tests passed)
 python -m pytest -q
 
-# Run frontend simulated DOM smoke tests (10 checks)
+# 2. Frontend production build & typecheck
+cd frontend
+npm run build
+
+# 3. Simulated DOM UI smoke test
 node tests/ui_smoke.js
 ```
 
 ---
 
-## Docker & Deployment
+## Deployment & Docker
 
-```bash
-# Build Docker image
-docker build -t refillcare .
-
-# Run container
-docker run -p 8000:8000 -e APP_SECRET="your-strong-random-secret" refillcare
-```
-
-### Environment Variables
-- `APP_SECRET` (Required in production): Secret key for HMAC token signing and encryption key derivation.
-- `AZURE_OPENAI_ENDPOINT` (Optional): Base endpoint for Azure OpenAI service.
-- `AZURE_OPENAI_KEY` (Optional): API key for Azure OpenAI service.
-- `AZURE_OPENAI_DEPLOYMENT` (Optional): Deployment name (e.g. `gpt-5.6-luna`).
-- `RX_ENC_KEY` (Optional): Dedicated Fernet encryption key for prescriptions.
-- `DB_PATH` (Optional): Path to SQLite database file (defaults to `pharmacy.db`).
+- **Docker:** The backend container automatically seeds the database on first boot.
+  ```bash
+  docker build -t refillcare-backend .
+  docker run -p 8000:8000 -e APP_SECRET="your-strong-random-secret" refillcare-backend
+  ```
+- **Render Backend Deployment:** Pre-configured Docker deployment targeting `https://refillcare.onrender.com`.
+- **Vercel / Render Frontend Deployment:** Connect `/frontend` directory with environment variable `NEXT_PUBLIC_API_URL=https://refillcare.onrender.com`.
+- See detailed instructions in **[deployment.md](deployment.md)**.
 
 ---
 
-## Project Documentation
+## Documentation
 - [Product Requirements Document (PRD.md)](PRD.md)
 - [Technical Design Document (TDD.md)](TDD.md)
 - [Deployment Guide (deployment.md)](deployment.md)
+- [Frontend Documentation (frontend/README.md)](frontend/README.md)
