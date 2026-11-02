@@ -13,4 +13,5 @@ const {JSDOM,VirtualConsole}=require('jsdom'),B=process.env.BASE||'http://localh
  ck('pharmacist queue',app().includes('Verification queue')&&app().includes('RX-50214'));
  ck('review pane with actions',app().includes('Approve')&&app().includes('Telmisartan'));
  ck('prescription image beside items',!!d.querySelector('img.rx'));click('Dashboard');await w(800);ck('dashboard',app().includes('Median time to verify')&&app().includes('H1 register'));
+ win.out();await w(200);d.querySelector('#ph').value='9000000081';win.login();await w(900);ck('store staff screen',app().includes('Orders for your store')&&app().includes('RX-50211'));
  console.log(res.join('\n'));console.log('script errors:',errs.length?errs:'none');win.close();})();

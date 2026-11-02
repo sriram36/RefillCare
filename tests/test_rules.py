@@ -5,6 +5,9 @@ from fastapi.testclient import TestClient
 import app as A, rules as R
 c = TestClient(A.app)
 def H(phone): return {"Authorization": c.post("/api/login", json={"phone": phone, "otp": "123456"}).json()["token"]}
+def S(code, ph):
+    o = next(i for i in c.get("/api/orders", headers=ph).json() if i["code"] == code)
+    return H(f"900000008{o['store_id'] or 1}")  # store staff for the order
 it = lambda s, st, by=None: dict(name="x", schedule=s, status=st, approved_by=by)
 
 def test_gate_unit():
@@ -21,12 +24,13 @@ def test_routing_nearest_with_stock():
 def test_h_order_cannot_dispatch_until_approved():
     cu, ph = H("9000000001"), H("9000000099")
     code = c.post("/api/orders", data={"for_name": "Mother", "demo": "clean"}, headers=cu).json()["code"]
-    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "INV-1"}, headers=ph).status_code == 403
+    r1 = c.post(f"/api/orders/{code}/pack", json={"invoice": "INV-1"}, headers=ph); assert r1.status_code == 403  # pharmacists cannot pack
+    r1 = c.post(f"/api/orders/{code}/pack", json={"invoice": "INV-1"}, headers=S(code, ph)); assert r1.status_code == 403 and r1.json()["detail"]["code"] == "APPROVAL_REQUIRED"
     for i in c.get("/api/orders", headers=ph).json():
         if i["code"] == code:
             for x in i["items"]: assert c.post(f"/api/items/{x['id']}/decide", json={"action": "approve"}, headers=ph).status_code == 200
-    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "INV-1"}, headers=ph).status_code == 200
-    assert c.post(f"/api/orders/{code}/dispatch", headers=ph).status_code == 200
+    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "INV-1"}, headers=S(code, ph)).status_code == 200
+    assert c.post(f"/api/orders/{code}/dispatch", headers=S(code, ph)).status_code == 200
 def test_unreadable_and_restricted_and_roles():
     cu = H("9000000001")
     b = c.post("/api/orders", data={"for_name": "Mother", "demo": "blurry"}, headers=cu).json()["code"]
@@ -47,9 +51,9 @@ def test_generic_needs_customer_consent():
     code = c.post("/api/orders", data={"for_name": "Mother", "demo": "clean"}, headers=cu).json()["code"]
     o = _approve_all(code, ph); m = next(x for x in o["items"] if x["generic"])
     assert c.post(f"/api/items/{m['id']}/offer-generic", headers=ph).status_code == 200
-    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "I1"}, headers=ph).status_code == 403
+    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "I1"}, headers=S(code, ph)).status_code == 403
     assert c.post(f"/api/items/{m['id']}/consent", json={"accept": True}, headers=cu).status_code == 200
-    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "I1"}, headers=ph).status_code == 200
+    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "I1"}, headers=S(code, ph)).status_code == 200
     assert c.post(f"/api/items/{m['id']}/consent", json={"accept": True}, headers=H("9000000002")).status_code == 404
 def test_h1_needs_register_details():
     cu, ph = H("9000000001"), H("9000000099")
@@ -57,7 +61,7 @@ def test_h1_needs_register_details():
     it = next(i for i in c.get("/api/orders", headers=ph).json() if i["code"] == code)["items"][0]
     assert c.post(f"/api/items/{it['id']}/decide", json={"action": "approve"}, headers=ph).status_code == 422
     _approve_all(code, ph, prescriber="Dr A. Banerjee", patient="M Ghosh")
-    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "I2"}, headers=ph).status_code == 200
+    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "I2"}, headers=S(code, ph)).status_code == 200
     assert any(r["order_code"] == code for r in c.get("/api/dashboard", headers=ph).json()["register"])
 def test_dashboard_stock_and_invoice():
     cu, ph = H("9000000001"), H("9000000099")
@@ -88,3 +92,12 @@ def test_sample_orders_have_prescription_images():
     ph = H("9000000099")
     for code in ("RX-50211", "RX-50214", "RX-50219"):
         r = c.get(f"/api/orders/{code}/rx", headers=ph); assert r.status_code == 200 and r.content[:4] == b"\x89PNG"
+
+def test_store_staff_scope():
+    cu, ph = H("9000000001"), H("9000000099"); salt, behala = H("9000000081"), H("9000000082")
+    assert c.get("/api/orders/RX-50214/rx", headers=behala).status_code == 403  # store staff never see prescriptions
+    assert all(o["store_id"] == 2 for o in c.get("/api/orders", headers=behala).json())
+    r1 = c.post("/api/orders/RX-50214/pack", json={"invoice": "X1"}, headers=behala)
+    assert r1.status_code == 403 and r1.json()["detail"]["code"] == "APPROVAL_REQUIRED"  # sample order still waits for the pharmacist
+    assert c.post("/api/orders/RX-50211/dispatch", headers=behala).status_code == 403  # wrong store
+    assert c.post("/api/orders/RX-50211/dispatch", headers=salt).status_code == 200
