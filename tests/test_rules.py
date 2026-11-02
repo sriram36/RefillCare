@@ -446,3 +446,121 @@ def test_signin_rate_limiting_and_logout():
     assert c.get("/api/profiles", headers=headers).status_code == 401
 
 
+def test_upi_reference_and_delivery_partner():
+    cu = H("9000000001")
+    ph = H("9000000099")
+
+    # Order placed with UPI generates a mock UTR reference
+    code = c.post(
+        "/api/orders",
+        data={"for_name": "Mother", "demo": "clean", "payment": "upi_test", "area": "Salt Lake"},
+        headers=cu,
+    ).json()["code"]
+
+    order = next(i for i in c.get("/api/orders", headers=cu).json() if i["code"] == code)
+    assert order["payment"] == "upi_test"
+    assert order["paid"] == 1
+    assert order["payment_ref"] is not None and order["payment_ref"].startswith("UTR")
+
+    # Approve all items
+    _approve_all(code, ph)
+
+    # Store staff packs with invoice
+    staff_headers = S(code, ph)
+    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "INV-UPI-1"}, headers=staff_headers).status_code == 200
+
+    # Store staff dispatches with delivery partner
+    disp_res = c.post(
+        f"/api/orders/{code}/dispatch",
+        json={"partner": "Kolkata Express Courier"},
+        headers=staff_headers,
+    )
+    assert disp_res.status_code == 200
+    assert disp_res.json()["delivery_partner"] == "Kolkata Express Courier"
+
+    # Customer and pharmacist can see delivery partner
+    order_updated = next(i for i in c.get("/api/orders", headers=cu).json() if i["code"] == code)
+    assert order_updated["status"] == "dispatched"
+    assert order_updated["delivery_partner"] == "Kolkata Express Courier"
+
+
+def test_reminders_notification_stub():
+    ph = H("9000000099")
+    cu = H("9000000001")
+
+    # Clean today's notes for customer 1 so reminder can trigger
+    A.ex("delete from notes where customer_id = ?", 1)
+
+    res = c.post("/api/reminders/run", headers=ph)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["sent"] >= 1
+    # Customer phone should be notified
+    assert "9000000001" in data.get("notified", [])
+
+    # Customer sees the note in notes
+    notes = c.get("/api/notes", headers=cu).json()
+    assert any("runs out in about" in n["text"] for n in notes)
+
+
+def test_order_audit_trail_and_dashboard_summary():
+    cu = H("9000000001")
+    ph = H("9000000099")
+    code = "RX-50211"
+
+    # Pharmacist viewing rx logs audit trail
+    c.get(f"/api/orders/{code}/rx", headers=ph)
+
+    # Pharmacist can query order audit trail
+    audit_res = c.get(f"/api/orders/{code}/audit", headers=ph)
+    assert audit_res.status_code == 200
+    audit_entries = audit_res.json()
+    assert any(a["action"] in ("view_rx", "upload_rx", "ask_reupload") for a in audit_entries)
+
+    # Customer cannot access audit trail (DPDP role enforcement)
+    assert c.get(f"/api/orders/{code}/audit", headers=cu).status_code == 403
+
+    # Pharmacist dashboard has 46-store / network summary & low stock alerts
+    dash = c.get("/api/dashboard", headers=ph).json()
+    assert "stores_summary" in dash
+    assert len(dash["stores_summary"]) >= 3
+    assert all("total_orders" in s and "low_stock_count" in s for s in dash["stores_summary"])
+    assert "low_stock_alerts" in dash
+    assert "network_overview" in dash
+    assert dash["network_overview"]["total_stores"] >= 3
+
+
+def test_generic_savings_calculation():
+    cu = H("9000000001")
+    ph = H("9000000099")
+
+    # Place order with clean demo (has Metformin, which has generic option)
+    code = c.post(
+        "/api/orders",
+        data={"for_name": "Mother", "demo": "clean"},
+        headers=cu,
+    ).json()["code"]
+
+    order = _approve_all(code, ph)
+    item_with_generic = next(x for x in order["items"] if x["generic"])
+
+    # Offer generic
+    assert c.post(f"/api/items/{item_with_generic['id']}/offer-generic", headers=ph).status_code == 200
+
+    # Accept generic
+    c.post(
+        f"/api/items/{item_with_generic['id']}/consent",
+        json={"accept": True},
+        headers=cu,
+    )
+
+    # Verify savings is computed
+    order_after = next(i for i in c.get("/api/orders", headers=cu).json() if i["code"] == code)
+    assert order_after["total_savings"] > 0
+    item_after = next(i for i in order_after["items"] if i["id"] == item_with_generic["id"])
+    assert item_after["savings"] > 0
+    # Original Metformin was 120, generic is 80; qty=4 -> savings = (120-80)*4 = 160
+    assert item_after["savings"] == (120 - 80) * 4
+
+
+

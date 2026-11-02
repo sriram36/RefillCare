@@ -42,8 +42,8 @@ create table users(id integer primary key, name, phone unique, role, store_id, c
 create table meds(id integer primary key, name, schedule, price, generic_of);
 create table stores(id integer primary key, name, lat, lng);
 create table stock(store_id, med_id, qty, primary key(store_id, med_id));
-create table orders(code primary key, customer_id, for_name, status, store_id, rx_file, note, created, verified_at, invoice_no, payment default 'cod', paid default 0, area default 'Park Street');
-create table items(id integer primary key, order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason, offer, consent);
+create table orders(code primary key, customer_id, for_name, status, store_id, rx_file, note, created, verified_at, invoice_no, payment default 'cod', paid default 0, area default 'Park Street', payment_ref, delivery_partner);
+create table items(id integer primary key, order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason, offer, consent, original_price);
 create table refills(id integer primary key, customer_id, for_name, med_id, qty, per_day, last_filled);
 create table audit(ts, actor, action, entity);
 create table profiles(id integer primary key, customer_id, name, relation, is_minor default 0, guardian_consent default 0);
@@ -219,6 +219,9 @@ def ensure_schema():
         ("token_ver", "alter table users add column token_ver integer default 1"),
         ("is_minor", "alter table profiles add column is_minor integer default 0"),
         ("guardian_consent", "alter table profiles add column guardian_consent integer default 0"),
+        ("payment_ref", "alter table orders add column payment_ref text"),
+        ("delivery_partner", "alter table orders add column delivery_partner text"),
+        ("original_price", "alter table items add column original_price integer"),
     ]:
         try:
             connection.execute(ddl)
@@ -523,11 +526,13 @@ async def new_order(
         note,
         int(time.time()),
     )
+    payment_ref = f"UTR{int(time.time() * 1000) % 10000000000:010d}" if payment == "upi_test" else None
     ex(
-        "update orders set payment = ?, paid = ?, area = ? where code = ?",
+        "update orders set payment = ?, paid = ?, area = ?, payment_ref = ? where code = ?",
         payment,
         1 if payment == "upi_test" else 0,
         area,
+        payment_ref,
         code,
     )
 
@@ -658,6 +663,7 @@ async def reupload_rx(
 
 def full(o: dict) -> dict:
     o["items"] = q("select * from items where order_code = ?", o["code"])
+    total_savings = 0
     for i in o["items"]:
         i["generic"] = (
             q(
@@ -673,6 +679,12 @@ def full(o: dict) -> dict:
             if i["offer"]
             else None
         )
+        if i.get("consent") == 1 and i.get("original_price") and i["original_price"] > i["price"]:
+            i["savings"] = (i["original_price"] - i["price"]) * i["qty"]
+            total_savings += i["savings"]
+        else:
+            i["savings"] = 0
+    o["total_savings"] = total_savings
     store_record = q("select name from stores where id = ?", o["store_id"], one=True)
     o["store"] = store_record["name"] if store_record else None
     return o
@@ -705,6 +717,21 @@ def get_rx_image(code: str, u=Depends(auth)):
     with open(f"{STORE}/{o['rx_file']}", "rb") as enc_file:
         decrypted_bytes = Fernet(FKEY).decrypt(enc_file.read())
     return Response(content=decrypted_bytes, media_type="image/png")
+
+
+@app.get("/api/orders/{code}/audit")
+def get_order_audit(code: str, u=Depends(auth)):
+    need(u, "pharmacist")
+    o = q("select * from orders where code = ?", code, one=True)
+    if not o:
+        raise HTTPException(404, "Order not found")
+    logs = q(
+        "select * from audit where entity = ? or entity like ? or (action in ('view_rx', 'upload_rx', 'reupload_rx', 'ask_reupload') and entity = ?) order by ts desc",
+        code,
+        f"%{code}%",
+        code,
+    )
+    return logs
 
 
 class Decision(BaseModel):
@@ -908,9 +935,16 @@ def pack(code: str, b: Pack, u=Depends(auth)):
     return advance(code, "approved", "packed", u, b.invoice.strip()[:30])
 
 
+class DispatchReq(BaseModel):
+    partner: str | None = None
+
+
 @app.post("/api/orders/{code}/dispatch")
-def dispatch(code: str, u=Depends(auth)):
-    return advance(code, "packed", "dispatched", u)
+def dispatch(code: str, b: DispatchReq | None = None, u=Depends(auth)):
+    partner = (b.partner if b and b.partner else "Local Express Delivery").strip()[:60]
+    res = advance(code, "packed", "dispatched", u)
+    ex("update orders set delivery_partner = ? where code = ?", partner, code)
+    return {**res, "delivery_partner": partner}
 
 
 @app.get("/api/refills")
@@ -1029,11 +1063,13 @@ def consent(iid: int, b: Consent, u=Depends(auth)):
 
     if b.accept:
         g = q("select * from meds where id = ?", it["offer"], one=True)
+        orig_price = it.get("original_price") or it["price"]
         ex(
-            "update items set med_id = ?, name = ?, price = ?, consent = 1 where id = ?",
+            "update items set med_id = ?, name = ?, price = ?, consent = 1, original_price = ? where id = ?",
             g["id"],
             g["name"],
             g["price"],
+            orig_price,
             iid,
         )
     else:
@@ -1049,8 +1085,8 @@ def dashboard(u=Depends(auth)):
     need(u, "pharmacist")
     all_orders = q("select * from orders")
 
-    # Load all store names once — avoids N+1 queries per order.
-    store_names: dict[int, str] = {s["id"]: s["name"] for s in q("select id, name from stores")}
+    stores = q("select * from stores order by id")
+    store_names: dict[int, str] = {s["id"]: s["name"] for s in stores}
 
     by_store: dict[str, int] = {}
     rejections: dict[str, int] = {}
@@ -1069,12 +1105,47 @@ def dashboard(u=Depends(auth)):
         if o["verified_at"]
     ]
 
+    stock_rows = q("select s.store_id, s.med_id, s.qty, m.name as med_name from stock s join meds m on m.id = s.med_id")
+    low_stock_alerts = [
+        {
+            "store_id": s["store_id"],
+            "store_name": store_names.get(s["store_id"], f"Store #{s['store_id']}"),
+            "med_id": s["med_id"],
+            "med_name": s["med_name"],
+            "qty": s["qty"],
+        }
+        for s in stock_rows
+        if s["qty"] <= 5
+    ]
+
+    stores_summary = []
+    for s in stores:
+        sid = s["id"]
+        s_orders = [o for o in all_orders if o["store_id"] == sid]
+        stores_summary.append({
+            "id": sid,
+            "name": s["name"],
+            "total_orders": len(s_orders),
+            "awaiting": sum(1 for o in s_orders if o["status"] == "awaiting_pharmacist"),
+            "approved": sum(1 for o in s_orders if o["status"] == "approved"),
+            "packed": sum(1 for o in s_orders if o["status"] == "packed"),
+            "dispatched": sum(1 for o in s_orders if o["status"] == "dispatched"),
+            "low_stock_count": sum(1 for a in low_stock_alerts if a["store_id"] == sid),
+        })
+
     return {
         "by_store": by_store,
         "rejections": rejections,
         "median_verify_min": round(statistics.median(mins), 1) if mins else None,
         "register": q("select * from register order by ts desc"),
         "audit": q("select * from audit order by ts desc limit 15"),
+        "stores_summary": stores_summary,
+        "low_stock_alerts": low_stock_alerts,
+        "network_overview": {
+            "total_stores": len(stores),
+            "active_orders": sum(1 for o in all_orders if o["status"] not in ("dispatched", "rejected")),
+            "total_orders": len(all_orders),
+        },
     }
 
 
@@ -1187,11 +1258,13 @@ def cart(b: Cart, u=Depends(auth)):
         "",
         int(time.time()),
     )
+    payment_ref = f"UTR{int(time.time() * 1000) % 10000000000:010d}" if b.payment == "upi_test" else None
     ex(
-        "update orders set payment = ?, paid = ?, area = ? where code = ?",
+        "update orders set payment = ?, paid = ?, area = ?, payment_ref = ? where code = ?",
         b.payment,
         1 if b.payment == "upi_test" else 0,
         b.area,
+        payment_ref,
         code,
     )
 
@@ -1296,13 +1369,23 @@ def get_notes(u=Depends(auth)):
     )
 
 
+def notify(phone: str, text: str):
+    """Notification stub: prints to stdout or integrates with SMS/WhatsApp provider."""
+    print(f"[notify] SMS to {phone}: {text}", flush=True)
+
+
 @app.post("/api/reminders/run")
 def run_reminders(u=Depends(auth)):
     need(u, "pharmacist")
     count = 0
+    notified = []
     today = date.today().isoformat()
 
-    for r in q("select r.*, m.name from refills r join meds m on m.id = r.med_id"):
+    for r in q(
+        "select r.*, m.name, u.phone from refills r "
+        "join meds m on m.id = r.med_id "
+        "join users u on u.id = r.customer_id"
+    ):
         filled_date = date.fromisoformat(r["last_filled"])
         days_supply = r["qty"] // r["per_day"]
         left = (filled_date + timedelta(days=days_supply) - date.today()).days
@@ -1314,17 +1397,21 @@ def run_reminders(u=Depends(auth)):
             f"%{r['name']}%{r['for_name']}%",
             one=True,
         ):
+            msg = f"{r['name']} for {r['for_name']} runs out in about {max(left, 0)} days. Reorder in one tap."
             ex(
                 "insert into notes values(?, ?, ?, ?)",
                 r["customer_id"],
-                f"{r['name']} for {r['for_name']} runs out in about {max(left, 0)} days. Reorder in one tap.",
+                msg,
                 int(time.time()),
                 today,
             )
+            if r.get("phone"):
+                notify(r["phone"], msg)
+                notified.append(r["phone"])
             count += 1
 
     log(u["name"], "run_reminders", f"{count} sent")
-    return {"sent": count}
+    return {"sent": count, "notified": notified}
 
 
 @app.get("/")

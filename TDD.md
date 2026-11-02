@@ -51,6 +51,15 @@ FastAPI + SQLite, single service, plain HTML/JS frontend without build framework
 - In-memory rate limiting: 5 failed OTP attempts for a phone number within 10 minutes returns HTTP 429 lockout.
 - Real token revocation: tokens carry the user's `token_ver` (`{uid}.{token_ver}.{exp}.{sig}`). Invoking `POST /api/logout` increments `token_ver` in SQLite, instantly invalidating all existing tokens for that account.
 
+**Operations & Customer Tracking Extensions:**
+- Order progress timeline: Customer order cards display a 5-step visual tracking timeline (`Placed` → `Verification` → `Approved` → `Packed` → `Out for delivery`) with status-responsive indicator dots.
+- Mock UPI verification: When `upi_test` is selected, an explicit UTR reference (`payment_ref`) is recorded and surfaced across customer and store receipts.
+- Store handover tracking: Store staff record the designated delivery partner / executive upon dispatch (`delivery_partner`), visible to customers upon dispatch.
+- DPDP prescription audit access: Pharmacists can view order-specific audit logs (`GET /api/orders/{code}/audit`) detailing who uploaded, reviewed, and accessed prescription records.
+- 46-Store regional operations overview: Central dashboard provides an operational breakdown across all stores (awaiting, approved, packed, dispatched) alongside low-stock alerts (≤ 5 units).
+- Generic savings summary: Customer order view automatically calculates and highlights total rupee savings when generic substitutions are accepted.
+- Refill notification dispatch: `run_reminders()` triggers customer phone notifications via the `notify()` stub, providing immediate operational feedback.
+
 ## 4. AI Vision Prescription Reading
 A vision model reads uploaded prescription photos, outputting legible status, matched medicine lines, estimated quantities, and confidence scores (0.0 to 1.0).
 - **Draft only:** Model output is strictly advisory. Every detected line is fuzzy-matched against the approved catalog. Uncataloged lines or low confidence (<0.75) are visually flagged in amber.
@@ -88,7 +97,7 @@ A vision model reads uploaded prescription photos, outputting legible status, ma
   - DPDP Act customer consent flow, minor guardian consent enforcement, and data export (`GET /api/me/export`).
   - In-memory rate limiting and server-side token revocation on logout.
   - Customer interface in English, Bengali, and Hindi with responsive 390px layout.
-  - 16 automated backend tests (`python -m pytest -q`) and full simulated DOM UI smoke test (`node tests/ui_smoke.js`).
+  - 20 automated backend tests (`python -m pytest -q`) and full simulated DOM UI smoke test (`node tests/ui_smoke.js`).
 - **Not Built (Out of Brief Scope):**
   - Doctor teleconsultations and diagnostic lab test booking.
   - Live bank payment gateway integration (UPI test mode provided).

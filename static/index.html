@@ -239,6 +239,100 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       font-size: 0.95rem;
     }
+
+    .timeline {
+      display: flex;
+      align-items: center;
+      margin: 12px 0 10px;
+      padding: 0;
+      gap: 4px;
+      overflow-x: auto;
+    }
+
+    .tl-step {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.8rem;
+      color: var(--mute);
+      white-space: nowrap;
+    }
+
+    .tl-step.done {
+      color: var(--green);
+      font-weight: 500;
+    }
+
+    .tl-step.active {
+      color: var(--teal);
+      font-weight: 600;
+    }
+
+    .tl-step.hold {
+      color: var(--amber);
+      font-weight: 600;
+    }
+
+    .tl-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1.5px solid var(--line);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      line-height: 1;
+      background: var(--card);
+    }
+
+    .tl-step.done .tl-dot {
+      border-color: var(--green);
+      background: var(--green);
+      color: #fff;
+    }
+
+    .tl-step.active .tl-dot {
+      border-color: var(--teal);
+      background: var(--teal);
+      color: #fff;
+    }
+
+    .tl-step.hold .tl-dot {
+      border-color: var(--amber);
+      background: var(--amber);
+      color: #fff;
+    }
+
+    .tl-sep {
+      height: 2px;
+      width: 14px;
+      background: var(--line);
+      flex-shrink: 0;
+    }
+
+    .tl-sep.done {
+      background: var(--green);
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.88rem;
+    }
+
+    table.data-table th, table.data-table td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+    }
+
+    table.data-table th {
+      color: var(--mute);
+      font-weight: 600;
+      background: rgba(0, 0, 0, 0.02);
+    }
   </style>
 </head>
 <body>
@@ -305,7 +399,14 @@
         status_packed: 'Packed',
         status_dispatched: 'On the way',
         status_rejected: 'Not available',
-        rx_safety_note: 'A pharmacist checks every prescription before anything is packed.'
+        rx_safety_note: 'A pharmacist checks every prescription before anything is packed.',
+        step_placed: 'Placed',
+        step_review: 'Verification',
+        step_approved: 'Approved',
+        step_packed: 'Packed',
+        step_dispatched: 'Out for delivery',
+        delivery_by: 'Delivery partner',
+        saved_lbl: 'Saved'
       },
       bn: {
         reorder: 'আমার ওষুধ আবার অর্ডার করুন',
@@ -346,7 +447,14 @@
         status_packed: 'প্যাক করা হয়েছে',
         status_dispatched: 'পথে আছে',
         status_rejected: 'অনুপলব্ধ',
-        rx_safety_note: 'প্যাকিং করার আগে একজন ফার্মাসিস্ট প্রতিটি প্রেসক্রিপশন যাচাই করেন।'
+        rx_safety_note: 'প্যাকিং করার আগে একজন ফার্মাসিস্ট প্রতিটি প্রেসক্রিপশন যাচাই করেন।',
+        step_placed: 'অর্ডার জমা',
+        step_review: 'যাচাইকরণ',
+        step_approved: 'অনুমোদিত',
+        step_packed: 'প্যাক করা',
+        step_dispatched: 'ডেলিভারিতে বের হয়েছে',
+        delivery_by: 'ডেলিভারি পার্টনার',
+        saved_lbl: 'সাশ্রয়'
       },
       hi: {
         reorder: 'मेरी दवाइयाँ दोबारा मँगवाएँ',
@@ -387,7 +495,14 @@
         status_packed: 'पैक हो गया',
         status_dispatched: 'रास्ते में है',
         status_rejected: 'उपलब्ध नहीं',
-        rx_safety_note: 'दवा पैक करने से पहले फार्मासिस्ट हर पर्चे की जांच करते हैं।'
+        rx_safety_note: 'दवा पैक करने से पहले फार्मासिस्ट हर पर्चे की जांच करते हैं।',
+        step_placed: 'ऑर्डर दर्ज',
+        step_review: 'सत्यापन',
+        step_approved: 'स्वीकृत',
+        step_packed: 'पैक हुआ',
+        step_dispatched: 'डिलीवरी के लिए रवाना',
+        delivery_by: 'डिलीवरी पार्टनर',
+        saved_lbl: 'बचत'
       }
     };
     const t = k => (L[LG] && L[LG][k]) || L.en[k] || k;
@@ -458,6 +573,41 @@
       const [defaultLabel, colorClass] = LBL[status] || [status, ''];
       const label = translated || defaultLabel;
       return `<span class="pill ${colorClass}">${label}</span>`;
+    };
+
+    const timeline = status => {
+      if (status === 'rejected') {
+        return `<div class="timeline"><span class="tl-step done"><span class="tl-dot">✓</span> ${esc(t('step_placed'))}</span><span class="tl-sep done"></span><span class="tl-step hold" style="color:var(--red)"><span class="tl-dot" style="background:var(--red);border-color:var(--red);color:#fff">✕</span> ${esc(t('status_rejected'))}</span></div>`;
+      }
+      const isHold = status === 'on_hold';
+      const s2Done = ['approved', 'packed', 'dispatched'].includes(status);
+      const s2Active = status === 'awaiting_pharmacist';
+      const s3Done = ['packed', 'dispatched'].includes(status);
+      const s3Active = status === 'approved';
+      const s4Done = status === 'dispatched';
+      const s4Active = status === 'packed';
+      const s5Done = status === 'dispatched';
+
+      return `
+        <div class="timeline" aria-label="Order progress">
+          <span class="tl-step done"><span class="tl-dot">✓</span> ${esc(t('step_placed'))}</span>
+          <span class="tl-sep ${s2Done ? 'done' : ''}"></span>
+          <span class="tl-step ${s2Done ? 'done' : isHold ? 'hold' : s2Active ? 'active' : ''}">
+            <span class="tl-dot">${s2Done ? '✓' : isHold ? '!' : '2'}</span> ${esc(isHold ? t('status_on_hold') : t('step_review'))}
+          </span>
+          <span class="tl-sep ${s3Done ? 'done' : ''}"></span>
+          <span class="tl-step ${s3Done ? 'done' : s3Active ? 'active' : ''}">
+            <span class="tl-dot">${s3Done ? '✓' : '3'}</span> ${esc(t('step_approved'))}
+          </span>
+          <span class="tl-sep ${s4Done ? 'done' : ''}"></span>
+          <span class="tl-step ${s4Done ? 'done' : s4Active ? 'active' : ''}">
+            <span class="tl-dot">${s4Done ? '✓' : '4'}</span> ${esc(t('step_packed'))}
+          </span>
+          <span class="tl-sep ${s5Done ? 'done' : ''}"></span>
+          <span class="tl-step ${s5Done ? 'done' : ''}">
+            <span class="tl-dot">${s5Done ? '✓' : '5'}</span> ${esc(t('step_dispatched'))}
+          </span>
+        </div>`;
     };
 
     async function render() {
@@ -607,9 +757,12 @@
                   <b>${o.code}</b>
                   ${pill(o.status)}
                 </div>
+                ${timeline(o.status)}
                 <div class="mute">
-                  ${t('for_lbl')} ${esc(o.for_name)}${o.store ? '. ' + t('store_lbl') + ': ' + esc(o.store) : ''}${o.payment === 'upi_test' ? '. ' + t('paid_upi') : '. ' + t('pay_delivery')}
+                  ${t('for_lbl')} ${esc(o.for_name)}${o.store ? '. ' + t('store_lbl') + ': ' + esc(o.store) : ''}${o.payment === 'upi_test' ? '. ' + t('paid_upi') + (o.payment_ref ? ` (${esc(o.payment_ref)})` : '') : '. ' + t('pay_delivery')}
                 </div>
+                ${o.delivery_partner && o.status === 'dispatched' ? `<div class="ok" style="font-size:0.88rem;margin-top:2px">🚚 ${esc(t('delivery_by'))}: <b>${esc(o.delivery_partner)}</b></div>` : ''}
+                ${o.total_savings ? `<div style="margin-top:4px"><span class="pill ok">🎉 ${esc(t('saved_lbl'))} ₹${o.total_savings}</span></div>` : ''}
                 ${o.note ? `<div class="${o.status === 'on_hold' ? 'bad' : 'mute'}">${esc(o.note)}</div>` : ''}
                 ${o.status === 'on_hold'
                   ? `<form onsubmit="reup(event, '${o.code}')" class="row" style="justify-content:flex-start;margin-top:8px">
@@ -783,6 +936,12 @@
             <div class="row" style="justify-content:flex-start">
               <button onclick="hold('${order.code}')">Ask for new photo</button>
             </div>
+            <div style="margin-top:14px">
+              <details>
+                <summary style="cursor:pointer;font-size:0.88rem;color:var(--mute)"><b>Prescription access audit log (DPDP Act)</b></summary>
+                <div id="rx-audit" style="margin-top:8px;font-size:0.85rem" class="mute">Loading access logs…</div>
+              </details>
+            </div>
           </div>
         </div>`;
 
@@ -794,6 +953,13 @@
       } catch {
         $('#img').innerHTML = '<p class="mute">No prescription image on file for this order.</p>';
       }
+
+      api('orders/' + order.code + '/audit').then(logs => {
+        const el = $('#rx-audit');
+        if (!el) return;
+        if (!logs.length) { el.textContent = 'No access events logged yet.'; return; }
+        el.innerHTML = logs.map(a => `<div>${new Date(a.ts * 1000).toLocaleTimeString()}: <b>${esc(a.actor)}</b> ${esc(a.action)}</div>`).join('');
+      }).catch(() => {});
     }
 
     function appr(id, schedule) {
@@ -830,6 +996,52 @@
         </div>
         <h2>Across all stores</h2>
         <div class="card">Median time to verify: <b>${d.median_verify_min ?? 'n/a'} min</b></div>
+
+        <div class="card row" style="justify-content:space-around;text-align:center">
+          <div><div class="mute">Total Stores</div><b>${d.network_overview?.total_stores ?? 3}</b></div>
+          <div><div class="mute">Active Orders</div><b>${d.network_overview?.active_orders ?? 0}</b></div>
+          <div><div class="mute">Total Orders</div><b>${d.network_overview?.total_orders ?? 0}</b></div>
+        </div>
+
+        <h2>46-Store network summary</h2>
+        <div class="card" style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Store</th>
+                <th>Total</th>
+                <th>Awaiting</th>
+                <th>Approved</th>
+                <th>Packed</th>
+                <th>Dispatched</th>
+                <th>Stock status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(d.stores_summary || []).map(s => `
+                <tr>
+                  <td><b>${esc(s.name)}</b></td>
+                  <td>${s.total_orders}</td>
+                  <td>${s.awaiting}</td>
+                  <td>${s.approved}</td>
+                  <td>${s.packed}</td>
+                  <td>${s.dispatched}</td>
+                  <td>${s.low_stock_count > 0 ? `<span class="pill bad">⚠️ ${s.low_stock_count} low</span>` : '<span class="pill ok">Healthy</span>'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        ${d.low_stock_alerts && d.low_stock_alerts.length ? `
+          <h2>Low-stock inventory alerts (&le; 5 units)</h2>
+          <div class="card">
+            ${d.low_stock_alerts.map(a => `
+              <div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)">
+                <span><b>${esc(a.med_name)}</b> (${esc(a.store_name)})</span>
+                <span class="pill bad">${a.qty} in stock</span>
+              </div>`).join('')}
+          </div>` : ''
+        }
 
         <div class="two">
           <div class="card">
@@ -868,6 +1080,11 @@
         }`;
     }
 
+    function dispatchOrder(code) {
+      const partner = prompt('Delivery partner / courier:', 'Local Express Delivery') || 'Local Express Delivery';
+      act(() => post('orders/' + code + '/dispatch', { partner }), 'Handed to delivery');
+    }
+
     async function storeView() {
       const orders = await api('orders');
       $('#app').innerHTML = `
@@ -887,8 +1104,8 @@
               : o.status === 'approved'
               ? `<button class="p" onclick="pack('${o.code}')">Pack and enter invoice number</button>`
               : o.status === 'packed'
-              ? `<button class="p" onclick="act(()=>post('orders/${o.code}/dispatch'), 'Handed to delivery')">Hand to delivery</button>`
-              : `<div class="ok">Handed to delivery. Invoice ${esc(o.invoice_no)}</div>`
+              ? `<button class="p" onclick="dispatchOrder('${o.code}')">Hand to delivery</button>`
+              : `<div class="ok">Handed to delivery${o.delivery_partner ? ` (${esc(o.delivery_partner)})` : ''}. Invoice ${esc(o.invoice_no)}</div>`
             }
           </div>`).join('') || '<div class="card mute">No orders for your store yet.</div>'
         }`;
