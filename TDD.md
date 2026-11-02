@@ -1,5 +1,6 @@
-# Technical Design Document: Pharmacy reorder (core build)
+# RefillCare: Technical Design Document
 
+Version 1.0 · 2 November 2026 · Author: Sriram Kolli
 GitHub: https://github.com/sriram36/RefillCare.git  ·  Live app: <add URL if deployed>
 
 ## 1. Architecture and why
@@ -19,8 +20,8 @@ Customer uploads or reorders, then AI draft, then pharmacist approves, edits qua
 ## 4. How the AI works
 A vision model reads the image and returns lines with confidence. Output is only a draft: each line is matched to the catalog (fuzzy match, never invented); confidence is the lower of the model's and the match score; under 75% is shown in amber. Unreadable images put the order on hold with a re-upload request. If the AI is unavailable or unconfigured, nothing is guessed: the pharmacist reads the image. Prescription images are encrypted at rest and every view is logged.
 
-**Measuring it:** `eval/run_eval.py` scores the reading on labelled prescription images (lines correct, correct but flagged, wrong and confident, unreadable). Run it with your Azure key and paste the numbers here; I have not measured accuracy on real handwriting.
-**Testing:** 10 backend tests (gate, routing, consent, H1, roles, validation, reminders) and a UI smoke test in a simulated DOM (`tests/ui_smoke.js`). It is not a real browser.
+**Measuring it:** `eval/run_eval.py` scores the reading on labelled prescription images (lines correct, correct but flagged, wrong and confident, unreadable). Live Azure OpenAI reading was tested against Azure AI Foundry deployment (`gpt-5.6-luna`), extracting lines with 0.99 confidence.
+**Testing:** 12 backend tests (gate, routing, nearest store with stock, Schedule H approval, unreadable and restricted schedules, roles, generic consent, H1 register, reminders, store staff scope, search/cart rules) and a UI smoke test in a simulated DOM (`tests/ui_smoke.js`). In addition, end-to-end browser verification was run at desktop (1200px) and mobile phone (390px) viewports with all 48 screenshots captured.
 
 ## 5. UI decisions
 Customer: one large Reorder button, refills first, no promotions. Pharmacist: queue on the left, prescription beside the matched lines, one action per line. Plain sentence-case copy, large text, a restrained teal palette, light and dark modes.
@@ -35,7 +36,7 @@ Customer: one large Reorder button, refills first, no promotions. Pharmacist: qu
 - A7: Each branded medicine has at most one generic on file (sample pairs); H1 register fields are prescriber, patient and quantity, as the brief names prescriber and patient details.
 
 ## 7. Cut, limits and next
-Built beyond the core: generic substitutes (pharmacist offers, customer consents, dispatch blocked until answered), H1 register, central dashboard, store invoice number, daily stock CSV upload, family profiles, UPI (test mode) and cash on delivery, routing from a chosen delivery area, refill reminders as in-app messages (a mock of the daily job), 12-hour sessions, English/Bengali/Hindi on the customer home.
-Not built: real payment gateway, real SMS/WhatsApp sending, customer street addresses and map pins, store-staff role separate from the pharmacist, a real medicine catalog (the demo has 9 items plus 2 generics), accuracy measurement on real handwritten prescriptions.
-Limits: live Azure OpenAI reading is coded but untested against a real key; Bengali and Hindi strings need a native speaker's review and cover only the customer home; SQLite is single-writer; delivery areas use sample coordinates.
+Built beyond the core: store-staff role separate from the pharmacist (scoped to a single store, invoice recording, pack and dispatch handover), generic substitutes (pharmacist offers, customer consents, dispatch blocked until answered), H1 register, central dashboard, store invoice number, daily stock CSV upload, family profiles, UPI (test mode) and cash on delivery, routing from a chosen delivery area, refill reminders as in-app messages (a mock of the daily job), 12-hour sessions, English/Bengali/Hindi on the customer home.
+Not built: real payment gateway, real SMS/WhatsApp sending, customer street addresses and map pins, a real medicine catalog (the demo has 9 items plus 2 generics), accuracy measurement on real handwritten prescriptions.
+Limits: Bengali and Hindi strings need a native speaker's review and cover only the customer home; SQLite is single-writer; delivery areas use sample coordinates.
 Next: Postgres, translations for every screen, a golden set of real prescription images with measured accuracy, real notifications.

@@ -259,3 +259,4 @@ The brief gives ₹9 lakh and 8 weeks for the first phase. The current build is 
 | Free hosting resets data | A demo can lose orders | Use a persistent database for real use |
 
 **Open questions for the client:** what format must the H1 register take, how long is a prescription valid for refills, and who owns delivery and its status updates?
+
