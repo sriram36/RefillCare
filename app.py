@@ -264,6 +264,35 @@ async def stock(file: UploadFile = File(...), u=Depends(auth)):
         assert rows and all(n >= 0 for _, _, n in rows)
     except Exception: raise HTTPException(422, "CSV needs the columns store_id, med_id, qty with whole numbers")
     c = db(); c.executemany("insert or replace into stock values(?,?,?)", rows); c.commit(); c.close(); log(u["name"], "stock_upload", f"{len(rows)} rows"); return {"rows": len(rows)}
+@app.get("/api/search")
+def search(term: str = "", u=Depends(auth)):
+    need(u, "customer"); t = term.strip()[:40]
+    if len(t) < 2: return []
+    rows = q("select id,name,schedule,price from meds where generic_of is null and name like ? limit 10", f"%{t}%")
+    for m in rows: m["rule"] = "blocked" if rule(m["schedule"])["blocked"] else "rx" if rule(m["schedule"])["rx"] else "ok"
+    return rows
+class CartLine(BaseModel): med_id: int; qty: int
+class Cart(BaseModel): for_name: str; lines: list[CartLine]; payment: str = "cod"; area: str = "Park Street"
+@app.post("/api/cart")
+def cart(b: Cart, u=Depends(auth)):  # over-the-counter items only; anything else must go through a prescription
+    need(u, "customer")
+    if not 1 <= len(b.lines) <= 10: raise HTTPException(422, "Add 1 to 10 items")
+    if not q("select 1 x from profiles where customer_id=? and name=?", u["id"], b.for_name.strip(), one=True): raise HTTPException(422, "Choose who this order is for")
+    if b.payment not in ("cod", "upi_test") or b.area not in AREAS: raise HTTPException(422, "Choose a valid payment method and delivery area")
+    picked = []
+    for l in b.lines:
+        m = q("select * from meds where id=? and generic_of is null", l.med_id, one=True)
+        if not m: raise HTTPException(404, "Medicine not found")
+        if rule(m["schedule"])["blocked"]: raise HTTPException(422, f"{m['name']} cannot be sold online")
+        if rule(m["schedule"])["rx"]: raise HTTPException(422, f"{m['name']} needs a prescription. Upload one for pharmacist approval")
+        if not 1 <= l.qty <= 20: raise HTTPException(422, "Quantity must be 1 to 20")
+        picked.append((m, l.qty))
+    code = f"RX-{50220 + q('select count(*) n from orders', one=True)['n']}"
+    ex("insert into orders(code,customer_id,for_name,status,store_id,rx_file,note,created) values(?,?,?,?,?,?,?,?)", code, u["id"], b.for_name.strip(), "approved", None, None, "", int(time.time()))
+    ex("update orders set payment=?, paid=?, area=? where code=?", b.payment, 1 if b.payment == "upi_test" else 0, b.area, code)
+    for m, n in picked: ex("insert into items(order_code,med_id,name,schedule,qty,price,conf,status,approved_by,reason) values(?,?,?,?,?,?,?,?,?,?)", code, m["id"], m["name"], m["schedule"], n, m["price"], 1.0, "approved", None, "")
+    settle(code); ex("update orders set verified_at=null where code=?", code)  # no pharmacist step, so it stays out of verification times
+    log(u["name"], "cart_order", code); return {"code": code}
 @app.get("/api/profiles")
 def profiles(u=Depends(auth)): need(u, "customer"); return q("select * from profiles where customer_id=?", u["id"])
 class Profile(BaseModel): name: str; relation: str = "Family"
