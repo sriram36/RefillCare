@@ -7,7 +7,7 @@ const {JSDOM,VirtualConsole}=require('jsdom'),B=process.env.BASE||'http://localh
  await w(300);ck('login screen',app().includes('Sign in'));
  d.querySelector('#ph').value='9000000001';win.login();await w(900);
  ck('customer home',app().includes('Reorder my medicines')&&app().includes('Running low')&&app().includes('Metformin'));
- ck('profiles in form',[...d.querySelectorAll('select[name=for_name] option')].some(o=>o.textContent==='Mother'));
+ ck('search box',!!d.querySelector('#sq'));ck('profiles in form',[...d.querySelectorAll('select[name=for_name] option')].some(o=>o.textContent==='Mother'));
  ck('sample order listed',app().includes('RX-50211'));
  win.out();await w(200);d.querySelector('#ph').value='9000000099';win.login();await w(1200);
  ck('pharmacist queue',app().includes('Verification queue')&&app().includes('RX-50214'));

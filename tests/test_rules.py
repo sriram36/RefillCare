@@ -101,3 +101,19 @@ def test_store_staff_scope():
     assert r1.status_code == 403 and r1.json()["detail"]["code"] == "APPROVAL_REQUIRED"  # sample order still waits for the pharmacist
     assert c.post("/api/orders/RX-50211/dispatch", headers=behala).status_code == 403  # wrong store
     assert c.post("/api/orders/RX-50211/dispatch", headers=salt).status_code == 200
+
+def test_search_and_cart_rules():
+    cu = H("9000000001"); ph = H("9000000099")
+    hits = {m["name"].split(",")[0]: m["rule"] for m in c.get("/api/search?term=mg", headers=cu).json()}
+    assert hits.get("Paracetamol 500 mg") == "ok" and hits.get("Metformin 500 mg") == "rx" and hits.get("Demo Narcotic 5 mg") == "blocked"
+    ids = {m["name"].split(",")[0]: m["id"] for m in c.get("/api/search?term=mg", headers=cu).json()}
+    body = lambda mid: {"for_name": "Mother", "lines": [{"med_id": mid, "qty": 2}]}
+    assert c.post("/api/cart", json=body(ids["Metformin 500 mg"]), headers=cu).status_code == 422
+    assert c.post("/api/cart", json=body(ids["Demo Narcotic 5 mg"]), headers=cu).status_code == 422
+    assert c.post("/api/cart", json={**body(ids["Paracetamol 500 mg"]), "for_name": "Stranger"}, headers=cu).status_code == 422
+    assert c.post("/api/cart", json={"for_name": "Mother", "lines": []}, headers=cu).status_code == 422
+    assert c.post("/api/cart", json=body(ids["Paracetamol 500 mg"]), headers=ph).status_code == 403
+    code = c.post("/api/cart", json=body(ids["Paracetamol 500 mg"]), headers=cu).json()["code"]
+    o = next(i for i in c.get("/api/orders", headers=cu).json() if i["code"] == code)
+    assert o["status"] == "approved" and o["store"]
+    assert c.post(f"/api/orders/{code}/pack", json={"invoice": "C1"}, headers=S(code, ph)).status_code == 200
