@@ -10,6 +10,8 @@
 ## Deploy
 Any host that runs a Python web service (Render, Railway, Fly). Start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`. Use a persistent disk for `pharmacy.db` and `rx_store/`.
 
+The live demo runs on a free instance. The first load can take about a minute, and orders reset when it restarts. Sample data is recreated automatically.
+
 ## Environment variables (names only)
 `APP_SECRET`, `RX_ENC_KEY` (Fernet key), `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_KEY`, `AZURE_OPENAI_DEPLOYMENT`, `DB_PATH` (optional).
 Without the Azure variables the app uses the four built-in demo prescriptions; any other upload goes to the pharmacist for manual reading.
