@@ -14,6 +14,8 @@ Roles: customer; pharmacist (verifies, offers generics, sees prescriptions and t
 Customer uploads or reorders, then AI draft, then pharmacist approves, edits quantity or rejects with a reason, then routing to the nearest store holding every approved line, then pack, then hand to delivery. Order states: awaiting_pharmacist, on_hold, approved, packed, dispatched, rejected.
 **The gate:** `can_dispatch()` runs on every pack and dispatch call, in the backend. Any prescription-only line that is not approved by a pharmacist blocks the order (HTTP 403). Restricted schedules (X, narcotic) are refused when the order is created. Unknown schedules are treated as prescription-only. Rules are a config table in `rules.py`.
 
+**Search and cart:** customers can search the catalog and add over-the-counter items to a cart. The server refuses prescription-only items (they need an uploaded prescription and pharmacist approval) and restricted items (never sold online), even if the API is called directly.
+
 ## 4. How the AI works
 A vision model reads the image and returns lines with confidence. Output is only a draft: each line is matched to the catalog (fuzzy match, never invented); confidence is the lower of the model's and the match score; under 75% is shown in amber. Unreadable images put the order on hold with a re-upload request. If the AI is unavailable or unconfigured, nothing is guessed: the pharmacist reads the image. Prescription images are encrypted at rest and every view is logged.
 
@@ -34,6 +36,6 @@ Customer: one large Reorder button, refills first, no promotions. Pharmacist: qu
 
 ## 7. Cut, limits and next
 Built beyond the core: generic substitutes (pharmacist offers, customer consents, dispatch blocked until answered), H1 register, central dashboard, store invoice number, daily stock CSV upload, family profiles, UPI (test mode) and cash on delivery, routing from a chosen delivery area, refill reminders as in-app messages (a mock of the daily job), 12-hour sessions, English/Bengali/Hindi on the customer home.
-Not built: real payment gateway, real SMS/WhatsApp sending, customer street addresses and map pins, store-staff role separate from the pharmacist, search across the full catalog (the demo catalog is small), accuracy measurement on real handwritten prescriptions.
+Not built: real payment gateway, real SMS/WhatsApp sending, customer street addresses and map pins, store-staff role separate from the pharmacist, a real medicine catalog (the demo has 9 items plus 2 generics), accuracy measurement on real handwritten prescriptions.
 Limits: live Azure OpenAI reading is coded but untested against a real key; Bengali and Hindi strings need a native speaker's review and cover only the customer home; SQLite is single-writer; delivery areas use sample coordinates.
 Next: Postgres, translations for every screen, a golden set of real prescription images with measured accuracy, real notifications.

@@ -49,3 +49,4 @@ With the app running: `npm i jsdom && BASE=http://localhost:8000/ node tests/ui_
 
 ## Publish
 `git remote add origin https://github.com/sriram36/<repo>.git && git push -u origin main` (keep the repo public until review ends).
+13. As a customer, search "para": Paracetamol can be added to the cart and ordered (no prescription needed). Search "metformin": it says it needs a prescription. Search "demo": the restricted items say "Not sold online".
