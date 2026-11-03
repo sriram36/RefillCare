@@ -8,7 +8,8 @@ const nextConfig = {
     unoptimized: true
   },
   async rewrites() {
-    const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://refillcare.onrender.com').replace(/\/+$/, '');
+    const backendUrl = (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+    if (!backendUrl) return [];
     return [
       {
         source: '/api/:path*',

@@ -1,6 +1,6 @@
 // Type-safe RefillCare API Client
 
-export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://refillcare.onrender.com').replace(/\/+$/, '');
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 
 export function buildApiUrl(path: string): string {
   if (path.startsWith('http')) return path;

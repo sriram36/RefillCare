@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Core & Database
-from core.config import BASE_DIR, DB, FKEY, SECRET, STORE, AREAS
+from core.config import BASE_DIR, DB, FKEY, SECRET, STORE, AREAS, CORS_ORIGINS
 from core.security import (
     auth, check_consent, check_minor_guardian_consent, check_rate_limit,
     need, record_failed_login, reset_failed_login, tok
@@ -30,10 +30,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Cross-Origin Resource Sharing (CORS) for standalone Next.js frontend
+# Cross-Origin Resource Sharing (CORS) configured via CORS_ORIGINS env var
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS if CORS_ORIGINS else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

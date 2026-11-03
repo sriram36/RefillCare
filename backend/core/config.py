@@ -34,3 +34,7 @@ AREAS = {
 AZURE_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_KEY = os.getenv("AZURE_OPENAI_KEY")
 AZURE_DEPLOY = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-5.6-luna")
+
+# Allowed CORS origins (comma-separated list, e.g. "http://localhost:3000,https://my-app.vercel.app")
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+
