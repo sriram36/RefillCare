@@ -1,6 +1,8 @@
+import time
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from core.security import auth, need
+from core.storage import delete_rx
 from database.session import ex, log, q
 from rules import rule
 from services.routing import settle
@@ -104,3 +106,38 @@ def consent(iid: int, b: Consent, u=Depends(auth)):
     log(u["name"], "generic_accept" if b.accept else "generic_decline", f"item {iid}")
     settle(it["order_code"])
     return {"ok": True}
+
+
+@router.post("/me/forget")
+def forget_me(u=Depends(auth)):
+    need(u, "customer")
+    uid = u["id"]
+    now = int(time.time())
+
+    # 1. Fetch user's orders to identify prescriptions for cleanup
+    user_orders = q("select code, rx_file from orders where customer_id = ?", uid)
+    for o in user_orders:
+        if o.get("rx_file"):
+            # Check if any items in this order are Schedule H1
+            has_h1 = q("select 1 from register where order_code = ?", o["code"], one=True)
+            if not has_h1:
+                delete_rx(o["rx_file"])
+                ex("update orders set rx_file = null where code = ?", o["code"])
+
+    # 2. Delete non-statutory family profiles and notes
+    ex("delete from profiles where customer_id = ?", uid)
+    ex("delete from notes where customer_id = ?", uid)
+    ex("delete from subscriptions where customer_id = ?", uid)
+
+    # 3. Anonymize user record and revoke tokens
+    anonymized_phone = f"erased_{uid}_{now}"
+    ex(
+        "update users set name = 'Anonymized Patient', phone = ?, consent_at = null, token_ver = token_ver + 1 where id = ?",
+        anonymized_phone,
+        uid,
+    )
+    log("dpdp_compliance", f"erasure_completed:user-{uid}", f"user-{uid}")
+    return {
+        "status": "erased",
+        "retained_statutory": "Schedule H1 regulatory register preserved per Drugs & Cosmetics Rule 65",
+    }

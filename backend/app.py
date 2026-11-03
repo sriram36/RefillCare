@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # Core & Database
 from core.config import BASE_DIR, DB, FKEY, SECRET, STORE, AREAS, CORS_ORIGINS
@@ -22,6 +23,7 @@ from routers.store import router as store_router
 from routers.refills import router as refills_router
 from routers.profiles import router as profiles_router
 from routers.dashboard import router as dashboard_router
+from routers.subscriptions import router as subscriptions_router
 
 # Create FastAPI application
 app = FastAPI(
@@ -29,6 +31,18 @@ app = FastAPI(
     description="Pharmacy reordering, pharmacist verification, and stock routing platform.",
     version="1.0.0",
 )
+
+# OWASP Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Cross-Origin Resource Sharing (CORS) configured via CORS_ORIGINS env var
 app.add_middleware(
@@ -47,6 +61,7 @@ app.include_router(store_router)
 app.include_router(refills_router)
 app.include_router(profiles_router)
 app.include_router(dashboard_router)
+app.include_router(subscriptions_router)
 
 
 @app.get("/")
@@ -60,6 +75,8 @@ def root():
             "auth": "/api/login",
             "orders": "/api/orders",
             "refills": "/api/refills",
+            "subscriptions": "/api/subscriptions",
+            "transfers": "/api/transfers",
             "dashboard": "/api/dashboard",
         },
     }
