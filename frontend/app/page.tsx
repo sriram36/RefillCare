@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Pill, Users, ShieldCheck, Store, BarChart3, Bell, CheckCircle, Sparkles, Shield, Clock } from 'lucide-react';
+import { ShieldCheck, BarChart3, CheckCircle, Sparkles, Shield, Clock } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 import { getUser, setUser as setStoredUser, setToken, postApi } from '../lib/api';
 import Header from '../components/Header';
@@ -14,7 +14,8 @@ import DashboardView from '../components/DashboardView';
 export default function Home() {
   const [user, setUser] = useState<any | null>(null);
   const [lang, setLang] = useState<Language>('en');
-  const [activeTab, setActiveTab] = useState<'customer' | 'pharmacist' | 'store' | 'dashboard'>('customer');
+  // Only pharmacists have a 2-tab UI; customers & store staff go straight to their view
+  const [activeTab, setActiveTab] = useState<'pharmacist' | 'dashboard'>('pharmacist');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -24,8 +25,6 @@ export default function Home() {
     if (u) {
       setUser(u);
       if (u.role === 'pharmacist') setActiveTab('pharmacist');
-      else if (u.role === 'store') setActiveTab('store');
-      else setActiveTab('customer');
     }
     const savedLang = localStorage.getItem('lang') as Language;
     if (savedLang && ['en', 'bn', 'hi'].includes(savedLang)) {
@@ -48,8 +47,6 @@ export default function Home() {
   const handleLoginSuccess = (loggedInUser: any) => {
     setUser(loggedInUser);
     if (loggedInUser.role === 'pharmacist') setActiveTab('pharmacist');
-    else if (loggedInUser.role === 'store') setActiveTab('store');
-    else setActiveTab('customer');
     showToast(`Welcome back, ${loggedInUser.name}`);
   };
 
@@ -62,10 +59,11 @@ export default function Home() {
     setToken('');
     setStoredUser(null);
     setUser(null);
-    setActiveTab('customer');
+    setActiveTab('pharmacist');
     showToast('Signed out successfully');
   };
 
+  // Suppress SSR/hydration mismatch
   if (!mounted) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">
@@ -80,32 +78,27 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-teal-100 selection:text-teal-900">
       {/* Sticky Header */}
-      <Header
-        user={user}
-        lang={lang}
-        onLangChange={handleLangChange}
-        onLogout={handleLogout}
-      />
+      <Header user={user} lang={lang} onLangChange={handleLangChange} onLogout={handleLogout} />
 
-      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        
-        {/* If user is not authenticated: Show Sign In & Trust Badges */}
+
+        {/* ══════════════ UNAUTHENTICATED — Landing + Auth ══════════════ */}
         {!user ? (
           <div className="space-y-8 py-6">
             <div className="text-center max-w-3xl mx-auto space-y-4">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold shadow-2xs">
                 <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-                RefillCare • 46 Stores Across Kolkata & Howrah
+                RefillCare • 46 Stores Across Kolkata &amp; Howrah
               </div>
               <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
                 Monthly Medicine Refills in 60 Seconds
               </h1>
               <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
-                Rapid prescription verification by licensed pharmacists, bioequivalent generic savings under Pradhan Mantri Janaushadhi guidelines, and same-day delivery from your nearest neighborhood pharmacy.
+                Rapid prescription verification by licensed pharmacists, bioequivalent generic savings under
+                Pradhan Mantri Janaushadhi guidelines, and same-day delivery from your nearest neighborhood pharmacy.
               </p>
 
-              {/* Trust Value Badges */}
+              {/* Trust badges */}
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs font-semibold text-slate-700">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 shadow-2xs">
                   <Shield className="w-3.5 h-3.5 text-teal-700" />
@@ -122,99 +115,80 @@ export default function Home() {
               </div>
             </div>
 
-            <AuthModal
-              lang={lang}
-              onLoginSuccess={handleLoginSuccess}
-              onError={showToast}
-            />
+            <AuthModal lang={lang} onLoginSuccess={handleLoginSuccess} onError={showToast} />
           </div>
+
         ) : (
-          /* When authenticated: Navigation Tabs & Role Views */
+          /* ══════════════ AUTHENTICATED — role-gated, no cross-role surfing ══════════════ */
           <div className="space-y-6">
-            
-            {/* Navigation Tab Bar for Role Switching & Exploration */}
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-3 flex-wrap gap-3">
-              <div className="flex items-center gap-1 sm:gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
-                <button
-                  onClick={() => setActiveTab('customer')}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                    activeTab === 'customer'
-                      ? 'bg-white text-teal-950 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Users className="w-3.5 h-3.5 text-teal-700" />
-                  Customer Portal
-                </button>
 
-                <button
-                  onClick={() => setActiveTab('pharmacist')}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                    activeTab === 'pharmacist'
-                      ? 'bg-white text-purple-950 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
-                  Pharmacist Verification
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('store')}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                    activeTab === 'store'
-                      ? 'bg-white text-blue-950 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Store className="w-3.5 h-3.5 text-blue-700" />
-                  Store Fulfillment
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('dashboard')}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                    activeTab === 'dashboard'
-                      ? 'bg-white text-teal-950 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <BarChart3 className="w-3.5 h-3.5 text-teal-700" />
-                  Central Operations
-                </button>
-              </div>
-
-              {/* Status Pill indicating Active Role */}
-              <div className="text-xs text-slate-500 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
-                Active Session: <strong className="text-slate-900 font-bold">{user.name}</strong> • <span className="capitalize text-teal-800 font-semibold">{user.role}</span>
-              </div>
-            </div>
-
-            {/* Active Tab View */}
-            {activeTab === 'customer' && (
+            {/* ── CUSTOMER: direct full-screen view, zero tabs ── */}
+            {user.role === 'customer' && (
               <CustomerView user={user} lang={lang} onToast={showToast} />
             )}
 
-            {activeTab === 'pharmacist' && (
-              <PharmacistView
-                user={user}
-                lang={lang}
-                onToast={showToast}
-                onOpenDashboard={() => setActiveTab('dashboard')}
-              />
-            )}
-
-            {activeTab === 'store' && (
+            {/* ── STORE STAFF: direct full-screen view, zero tabs ── */}
+            {user.role === 'store' && (
               <StoreView user={user} lang={lang} onToast={showToast} />
             )}
 
-            {activeTab === 'dashboard' && (
-              <DashboardView
-                user={user}
-                lang={lang}
-                onToast={showToast}
-                onBackToQueue={() => setActiveTab('pharmacist')}
-              />
+            {/* ── PHARMACIST: 2-tab nav (Verification ↔ Central Operations) ── */}
+            {user.role === 'pharmacist' && (
+              <>
+                {/* Pharmacist-only pill nav */}
+                <div className="flex items-center justify-between border-b border-slate-200/80 pb-3 flex-wrap gap-3">
+                  <div className="flex items-center gap-1 sm:gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
+                    <button
+                      onClick={() => setActiveTab('pharmacist')}
+                      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                        activeTab === 'pharmacist'
+                          ? 'bg-white text-purple-950 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
+                      Pharmacist Verification
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('dashboard')}
+                      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                        activeTab === 'dashboard'
+                          ? 'bg-white text-teal-950 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <BarChart3 className="w-3.5 h-3.5 text-teal-700" />
+                      Central Operations
+                    </button>
+                  </div>
+
+                  {/* Identity / role badge */}
+                  <div className="text-xs text-slate-500 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                    <span className="font-bold text-slate-900">{user.name}</span>
+                    <span className="mx-1.5 text-slate-300">•</span>
+                    <span className="text-purple-700 font-semibold">Pharmacist</span>
+                  </div>
+                </div>
+
+                {/* Tab content */}
+                {activeTab === 'pharmacist' && (
+                  <PharmacistView
+                    user={user}
+                    lang={lang}
+                    onToast={showToast}
+                    onOpenDashboard={() => setActiveTab('dashboard')}
+                  />
+                )}
+                {activeTab === 'dashboard' && (
+                  <DashboardView
+                    user={user}
+                    lang={lang}
+                    onToast={showToast}
+                    onBackToQueue={() => setActiveTab('pharmacist')}
+                  />
+                )}
+              </>
             )}
 
           </div>
@@ -222,7 +196,7 @@ export default function Home() {
 
       </main>
 
-      {/* Floating Toast Notification */}
+      {/* Toast notification */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-2xl bg-slate-900/95 px-5 py-3.5 text-xs font-semibold text-white shadow-2xl backdrop-blur-md border border-slate-700/50 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
@@ -235,10 +209,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-700">RefillCare Healthcare</span>
-            <span>• 46 Pharmacy Locations in Kolkata & Howrah</span>
+            <span>• 46 Pharmacy Locations in Kolkata &amp; Howrah</span>
           </div>
           <p className="text-slate-400">
-            Compliant with Drugs & Cosmetics Act (Rule 65) & DPDP Act 2023
+            Compliant with Drugs &amp; Cosmetics Act (Rule 65) &amp; DPDP Act 2023
           </p>
         </div>
       </footer>
