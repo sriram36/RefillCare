@@ -2,7 +2,7 @@ import time
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from core.config import AREAS
-from core.crypto import save_encrypted_prescription
+from core.storage import save_encrypted_rx
 from core.security import (
     auth, check_consent, check_minor_guardian_consent, need
 )
@@ -11,6 +11,7 @@ from rules import rule
 from services.catalog import match_medicine
 from services.ocr import demo_png, extract
 from services.routing import settle
+from services.payments import create_payment_order, verify_payment_signature
 
 router = APIRouter(prefix="/api", tags=["Orders & Cart"])
 
@@ -73,6 +74,7 @@ async def new_order(
     need(u, "customer")
     check_consent(u)
     check_minor_guardian_consent(u, for_name)
+
     raw = await file.read() if file else demo_png(demo)
     if not raw:
         raise HTTPException(400, "Add a prescription photo or pick a demo prescription")
@@ -94,7 +96,7 @@ async def new_order(
 
     order_count = q("select count(*) n from orders", one=True)["n"]
     code = f"RX-{50220 + order_count}"
-    save_encrypted_prescription(f"{code}.enc", raw)
+    save_encrypted_rx(f"{code}.enc", raw)
 
     res = extract(raw, demo)
     note = ""
@@ -165,6 +167,37 @@ async def new_order(
     return {"code": code}
 
 
+@router.post("/orders/{code}/consent-generic")
+def consent_generic(code: str, b: dict, u=Depends(auth)):
+    need(u, "customer")
+    check_consent(u)
+    item_id = b.get("item_id")
+    accepted = bool(b.get("accepted"))
+    item = q("select * from items where id = ? and order_code = ?", item_id, code, one=True)
+    if not item or not item.get("offer"):
+        raise HTTPException(404, "No generic offer found for this item")
+
+    if accepted:
+        generic_med = q("select * from meds where id = ?", item["offer"], one=True)
+        if not generic_med:
+            raise HTTPException(404, "Generic medicine record missing")
+        original_p = item.get("original_price") or item["price"]
+        ex(
+            "update items set med_id = ?, name = ?, price = ?, consent = 1, original_price = ? where id = ?",
+            generic_med["id"],
+            generic_med["name"],
+            generic_med["price"],
+            original_p,
+            item_id,
+        )
+        log(u["name"], "accept_generic", f"{code}:item-{item_id}")
+    else:
+        ex("update items set consent = 0 where id = ?", item_id)
+        log(u["name"], "decline_generic", f"{code}:item-{item_id}")
+
+    return {"status": "ok", "accepted": accepted}
+
+
 @router.post("/orders/{code}/reupload")
 async def reupload_rx(
     code: str,
@@ -190,7 +223,7 @@ async def reupload_rx(
     if not (raw[:4] == b"\x89PNG" or raw[:3] == b"\xff\xd8\xff"):
         raise HTTPException(415, "Upload a PNG or JPEG photo")
 
-    save_encrypted_prescription(f"{code}.enc", raw)
+    save_encrypted_rx(f"{code}.enc", raw)
     ex("delete from items where order_code = ?", code)
 
     res = extract(raw, demo)
@@ -341,3 +374,51 @@ def order_cart(b: CartOrder, u=Depends(auth)):
 
     log(u["name"], "cart_order", code)
     return {"code": code}
+
+
+@router.post("/orders/{code}/pay")
+def initiate_payment(code: str, u=Depends(auth)):
+    need(u, "customer")
+    o = q("select * from orders where code = ?", code, one=True)
+    if not o:
+        raise HTTPException(404, "Order not found")
+    items = q("select * from items where order_code = ? and status != 'rejected'", code)
+    total_amount = sum(i["price"] * i["qty"] for i in items) or 120
+
+    pay_data = create_payment_order(code, total_amount)
+    ex(
+        "insert into payment_orders(order_code, razorpay_order_id, amount, currency, created_at) values(?, ?, ?, ?, ?)",
+        code,
+        pay_data["razorpay_order_id"],
+        pay_data["amount"],
+        pay_data["currency"],
+        int(time.time()),
+    )
+    log(u["name"], "initiate_payment", code)
+    return pay_data
+
+
+@router.post("/payments/webhook")
+def payment_webhook(payload: dict):
+    event = payload.get("event")
+    payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+    order_id = payment_entity.get("order_id")
+    payment_id = payment_entity.get("id")
+    order_code = payment_entity.get("notes", {}).get("order_code")
+
+    if not order_code and order_id:
+        po = q("select order_code from payment_orders where razorpay_order_id = ?", order_id, one=True)
+        if po:
+            order_code = po["order_code"]
+
+    if order_code:
+        ex(
+            "update orders set paid = 1, payment = 'upi_razorpay', payment_ref = ? where code = ?",
+            payment_id,
+            order_code,
+        )
+        if order_id:
+            ex("update payment_orders set status = 'paid' where razorpay_order_id = ?", order_id)
+        log("webhook:razorpay", f"paid:{payment_id}", order_code)
+
+    return {"status": "ok", "order_code": order_code}

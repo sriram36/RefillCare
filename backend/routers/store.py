@@ -1,3 +1,4 @@
+import time
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from core.security import auth, need
@@ -58,3 +59,88 @@ def dispatch(code: str, b: DispatchReq | None = None, u=Depends(auth)):
     res = advance(code, "packed", "dispatched", u)
     ex("update orders set delivery_partner = ? where code = ?", partner, code)
     return {**res, "delivery_partner": partner}
+
+
+class TransferRequest(BaseModel):
+    to_store_id: int | None = None
+    from_store_id: int = 1
+    med_id: int
+    qty: int
+
+
+@router.get("/transfers")
+def get_transfers(u=Depends(auth)):
+    if u["role"] == "store":
+        rows = q(
+            """
+            select t.*, m.name as med_name, s1.name as from_store, s2.name as to_store
+            from transfers t
+            join meds m on t.med_id = m.id
+            left join stores s1 on t.from_store_id = s1.id
+            left join stores s2 on t.to_store_id = s2.id
+            where t.from_store_id = ? or t.to_store_id = ?
+            order by t.requested_at desc
+            """,
+            u["store_id"],
+            u["store_id"],
+        )
+    else:
+        rows = q(
+            """
+            select t.*, m.name as med_name, s1.name as from_store, s2.name as to_store
+            from transfers t
+            join meds m on t.med_id = m.id
+            left join stores s1 on t.from_store_id = s1.id
+            left join stores s2 on t.to_store_id = s2.id
+            order by t.requested_at desc
+            """
+        )
+    return rows
+
+
+@router.post("/transfers/request")
+def request_transfer(b: TransferRequest, u=Depends(auth)):
+    need(u, "store")
+    to_store = b.to_store_id or u["store_id"]
+    from_store = b.from_store_id
+    if to_store == from_store:
+        raise HTTPException(400, "Cannot transfer stock to the same store")
+    if b.qty <= 0:
+        raise HTTPException(400, "Quantity must be positive")
+
+    now = int(time.time())
+    tid = ex(
+        "insert into transfers(from_store_id, to_store_id, med_id, qty, status, requested_at) values(?, ?, ?, ?, 'requested', ?)",
+        from_store,
+        to_store,
+        b.med_id,
+        b.qty,
+        now,
+    )
+    log(u["name"], f"request_transfer:{b.qty}x{b.med_id}", f"transfer-{tid}")
+    return {"id": tid, "status": "requested", "qty": b.qty}
+
+
+@router.post("/transfers/{tid}/fulfill")
+def fulfill_transfer(tid: int, u=Depends(auth)):
+    need(u, "store")
+    tr = q("select * from transfers where id = ?", tid, one=True)
+    if not tr:
+        raise HTTPException(404, "Transfer record not found")
+    if tr["status"] == "fulfilled":
+        raise HTTPException(409, "Transfer is already fulfilled")
+
+    now = int(time.time())
+    from_stock = q("select qty from stock where store_id = ? and med_id = ?", tr["from_store_id"], tr["med_id"], one=True)
+    curr_from = from_stock["qty"] if from_stock else 0
+    new_from = max(0, curr_from - tr["qty"])
+    ex("insert or replace into stock(store_id, med_id, qty) values(?, ?, ?)", tr["from_store_id"], tr["med_id"], new_from)
+
+    to_stock = q("select qty from stock where store_id = ? and med_id = ?", tr["to_store_id"], tr["med_id"], one=True)
+    curr_to = to_stock["qty"] if to_stock else 0
+    new_to = curr_to + tr["qty"]
+    ex("insert or replace into stock(store_id, med_id, qty) values(?, ?, ?)", tr["to_store_id"], tr["med_id"], new_to)
+
+    ex("update transfers set status = 'fulfilled', fulfilled_at = ? where id = ?", now, tid)
+    log(u["name"], "fulfill_transfer", f"transfer-{tid}")
+    return {"id": tid, "status": "fulfilled"}
