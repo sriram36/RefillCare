@@ -12,8 +12,8 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalProps) {
-  const [phone, setPhone] = useState('9000000001');
-  const [otp, setOtp] = useState('123456');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
 
   const t = (k: string) => translate(k, lang);
@@ -118,7 +118,7 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
             Sign In with Registered Phone Number
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            Enter your mobile number to receive or enter the demo verification code (Default demo OTP is <code className="font-bold text-teal-800 bg-teal-50 px-1 rounded">123456</code>).
+            Enter your registered phone number. For the live demo, use any phone number from the cards above — OTP is <code className="font-bold text-teal-800 bg-teal-50 px-1 rounded">123456</code>.
           </p>
         </div>
 
@@ -134,7 +134,7 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="9000000001"
+                placeholder="10-digit mobile number"
                 className="w-full rounded-2xl border border-slate-300 py-2.5 pl-10 pr-3.5 text-sm font-medium text-slate-900 shadow-2xs outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 required
               />
@@ -152,7 +152,7 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
                 type="text"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                placeholder="123456"
+                placeholder="Enter OTP (demo: 123456)"
                 className="w-full rounded-2xl border border-slate-300 py-2.5 pl-10 pr-3.5 text-sm font-medium text-slate-900 shadow-2xs outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 required
               />

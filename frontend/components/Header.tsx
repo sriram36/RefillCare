@@ -70,9 +70,10 @@ export default function Header({ user, lang, onLangChange, onLogout }: HeaderPro
         {/* User Info & Sign out */}
         {user && (
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className={`hidden sm:flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold ${getRoleBadge(user.role)}`}>
-              <span className="capitalize">{user.name}</span>
-              <span className="text-[10px] opacity-70">({user.role})</span>
+            <div className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-bold ${getRoleBadge(user.role)}`}>
+              <span className="capitalize sm:hidden">{user.name.split(" ")[0]}</span>
+              <span className="capitalize hidden sm:inline">{user.name}</span>
+              <span className="text-[10px] opacity-70 hidden sm:inline">({user.role})</span>
             </div>
 
             <button

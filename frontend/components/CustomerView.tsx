@@ -291,6 +291,41 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
         </div>
       )}
 
+      {/* Generic Offer Pending Notification Bar */}
+      {(() => {
+        const pendingOffers = orders.filter(
+          o => (o.items || []).some((it: any) => it.offer && it.consent == null)
+        );
+        if (!pendingOffers.length) return null;
+        return (
+          <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 shadow-xs flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700 shrink-0">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-emerald-950 text-sm flex items-center gap-2 flex-wrap">
+                <span>Generic Savings Offer Waiting for Your Response</span>
+                <span className="text-[11px] font-semibold bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full">
+                  {pendingOffers.length} order{pendingOffers.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
+                Your pharmacist found a cheaper bioequivalent generic alternative. Check your orders below to accept and save.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                const el = document.getElementById('orders-section');
+                el?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="shrink-0 text-xs font-bold text-emerald-800 underline hover:text-emerald-950"
+            >
+              View
+            </button>
+          </div>
+        );
+      })()}
+
       {/* Hero 1-Tap Reorder Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-800 via-teal-700 to-emerald-900 p-6 sm:p-8 text-white shadow-xl">
         <div className="absolute -right-8 -bottom-8 w-56 h-56 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
@@ -420,8 +455,14 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
             })}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center text-xs text-slate-500">
-            {t('no_low')}
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-6 flex items-center gap-4">
+            <div className="p-3 rounded-full bg-emerald-50 shrink-0">
+              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800 text-sm">All supplies are topped up</p>
+              <p className="text-xs text-slate-500 mt-0.5">{t('no_low')} We'll alert you 10 days before any medicine runs low.</p>
+            </div>
           </div>
         )}
       </div>
@@ -442,9 +483,9 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
           <button
             type="button"
             onClick={() => setShowProfileModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 self-start sm:self-auto"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-teal-700 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 transition active:scale-95 self-start sm:self-auto"
           >
-            <UserPlus className="w-3.5 h-3.5 text-teal-700" />
+            <UserPlus className="w-3.5 h-3.5" />
             <span>Add Family Member</span>
           </button>
         </div>
@@ -727,7 +768,7 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
       </div>
 
       {/* Orders List & Active Timeline Tracking */}
-      <div className="space-y-4">
+      <div id="orders-section" className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">

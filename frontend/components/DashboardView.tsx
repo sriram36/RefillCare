@@ -89,8 +89,22 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
 
   if (loading && !data) {
     return (
-      <div className="text-center py-20 text-slate-500">
-        Loading 46-Store Central Operations Dashboard...
+      <div className="space-y-6 animate-pulse">
+        <div className="h-20 bg-slate-100 rounded-xl" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-28 bg-slate-100 rounded-xl" />
+          ))}
+        </div>
+        <div className="h-48 bg-slate-100 rounded-xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-40 bg-slate-100 rounded-xl" />
+          <div className="h-40 bg-slate-100 rounded-xl" />
+        </div>
+        <div className="flex items-center justify-center gap-2 pt-2 text-slate-400 text-xs">
+          <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+          Loading 46-Store Central Operations Dashboard…
+        </div>
       </div>
     );
   }
