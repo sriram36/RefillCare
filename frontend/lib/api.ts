@@ -1,6 +1,13 @@
 // Type-safe RefillCare API Client
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://refillcare.onrender.com').replace(/\/+$/, '');
+
+export function buildApiUrl(path: string): string {
+  if (path.startsWith('http')) return path;
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  const finalPath = cleanPath.startsWith('api/') ? cleanPath : `api/${cleanPath}`;
+  return API_BASE ? `${API_BASE}/${finalPath}` : `/${finalPath}`;
+}
 
 export function getToken(): string {
   if (typeof window === 'undefined') return '';
@@ -33,12 +40,7 @@ export async function fetchApi(path: string, options: RequestInit = {}) {
   const token = getToken();
   const isFormData = options.body instanceof FormData;
   
-  let url = path;
-  if (!path.startsWith('http')) {
-    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-    const finalPath = cleanPath.startsWith('api/') ? cleanPath : `api/${cleanPath}`;
-    url = `${API_BASE}/${finalPath}`;
-  }
+  const url = buildApiUrl(path);
   
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> || {}),

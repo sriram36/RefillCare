@@ -54,16 +54,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Detect compiled Next.js frontend directory
-FRONTEND_DIST = os.path.join(BASE_DIR, "out")
-if not os.path.exists(FRONTEND_DIST):
-    FRONTEND_DIST = os.path.join(os.path.dirname(BASE_DIR), "frontend", "out")
-
-if os.path.exists(FRONTEND_DIST):
-    next_static = os.path.join(FRONTEND_DIST, "_next")
-    if os.path.exists(next_static):
-        app.mount("/_next", StaticFiles(directory=next_static), name="next_static")
-
 AREAS = {
     "Park Street": (22.5535, 88.3520),
     "Salt Lake": (22.5867, 88.4171),
@@ -1451,9 +1441,6 @@ def run_reminders(u=Depends(auth)):
 
 @app.get("/")
 def root():
-    index_file = os.path.join(FRONTEND_DIST, "index.html") if os.path.exists(FRONTEND_DIST) else None
-    if index_file and os.path.exists(index_file):
-        return FileResponse(index_file)
     return {
         "service": "RefillCare API",
         "status": "healthy",
@@ -1481,16 +1468,4 @@ def seed_images():
 
 
 seed_images()
-
-
-@app.get("/{full_path:path}")
-def catch_all(full_path: str):
-    if os.path.exists(FRONTEND_DIST):
-        target = os.path.join(FRONTEND_DIST, full_path)
-        if os.path.isfile(target):
-            return FileResponse(target)
-        index_file = os.path.join(FRONTEND_DIST, "index.html")
-        if os.path.exists(index_file):
-            return FileResponse(index_file)
-    raise HTTPException(status_code=404, detail="Not Found")
 
