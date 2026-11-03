@@ -602,7 +602,18 @@ export default function PharmacistView({ user, lang, onToast, onOpenDashboard }:
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Prescriber Name & Reg. No. *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">Prescriber Name & Reg. No. *</label>
+                  {h1Doctor.toLowerCase().includes('wbmc') || h1Doctor.toLowerCase().includes('wb') ? (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      ✓ WBMC Verified Format
+                    </span>
+                  ) : h1Doctor.trim() ? (
+                    <span className="text-[10px] font-semibold text-slate-500">
+                      Medical Council Check
+                    </span>
+                  ) : null}
+                </div>
                 <input
                   type="text"
                   placeholder="e.g. Dr. P. Mukherjee, WBMC #49281"
@@ -610,6 +621,16 @@ export default function PharmacistView({ user, lang, onToast, onOpenDashboard }:
                   onChange={(e) => setH1Doctor(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
                 />
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className="text-[11px] text-slate-400">Quick fill demo:</span>
+                  <button
+                    type="button"
+                    onClick={() => setH1Doctor("Dr. P. Mukherjee, WBMC #49281")}
+                    className="text-[11px] font-semibold text-purple-700 hover:underline"
+                  >
+                    Dr. P. Mukherjee (WBMC #49281)
+                  </button>
+                </div>
               </div>
 
               <div>

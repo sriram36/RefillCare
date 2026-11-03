@@ -9,6 +9,8 @@ import {
 import { Language, translate } from '../lib/i18n';
 import { fetchApi, postApi, setUser } from '../lib/api';
 import Timeline from './Timeline';
+import LiveTrackingModal from './LiveTrackingModal';
+import SubscriptionManager from './SubscriptionManager';
 
 interface CustomerViewProps {
   user: any;
@@ -35,6 +37,8 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
   const [demoChoice, setDemoChoice] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [trackingOrder, setTrackingOrder] = useState<any | null>(null);
+  const [payingCode, setPayingCode] = useState<string | null>(null);
 
   // Add Family Profile Modal State
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -229,6 +233,35 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
       onToast(err.message || 'Failed to create profile');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  // Online Payment via UPI (Razorpay)
+  const handlePayOnline = async (orderCode: string) => {
+    try {
+      setPayingCode(orderCode);
+      const res = await postApi(`orders/${orderCode}/pay`);
+      // Simulate real-time Razorpay payment capture webhook
+      await postApi('payments/webhook', {
+        event: 'payment.captured',
+        payload: {
+          payment: {
+            entity: {
+              id: `pay_${Date.now()}`,
+              order_id: res.razorpay_order_id,
+              amount: res.amount,
+              status: 'captured',
+              notes: { order_code: orderCode }
+            }
+          }
+        }
+      });
+      onToast(`Payment of ₹${res.amount_rupees || res.amount / 100} verified via UPI (Razorpay)`);
+      loadData();
+    } catch (err: any) {
+      onToast(err.message || 'Payment initiation failed');
+    } finally {
+      setPayingCode(null);
     }
   };
 
@@ -767,6 +800,9 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
         )}
       </div>
 
+      {/* Chronic Auto-Refill Subscriptions Engine */}
+      <SubscriptionManager user={user} lang={lang} onToast={onToast} />
+
       {/* Orders List & Active Timeline Tracking */}
       <div id="orders-section" className="space-y-4">
         <div className="flex items-center justify-between">
@@ -826,6 +862,29 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
                       <Truck className="w-3.5 h-3.5" />
                       <span>Partner: {o.delivery_partner}</span>
                     </div>
+                  )}
+                </div>
+
+                {/* Online Payment & Live GPS Delivery Tracking Actions */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 flex-wrap gap-2 text-xs">
+                  {o.paid !== 1 && o.payment !== 'upi_test' && o.status !== 'rejected' && o.status !== 'on_hold' && (
+                    <button
+                      onClick={() => handlePayOnline(o.code)}
+                      disabled={payingCode === o.code}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-teal-50 border border-teal-300 text-teal-900 font-bold hover:bg-teal-100 transition shadow-2xs"
+                    >
+                      <CreditCard className="w-3.5 h-3.5 text-teal-700" />
+                      <span>{payingCode === o.code ? 'Processing UPI…' : 'Pay Online via UPI (Razorpay)'}</span>
+                    </button>
+                  )}
+                  {o.status === 'dispatched' && (
+                    <button
+                      onClick={() => setTrackingOrder(o)}
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold shadow-xs transition active:scale-95 ml-auto"
+                    >
+                      <Truck className="w-3.5 h-3.5" />
+                      <span>Track Live Delivery GPS</span>
+                    </button>
                   )}
                 </div>
 

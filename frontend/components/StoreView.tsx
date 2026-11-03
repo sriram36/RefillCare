@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Package, Truck, CheckCircle2, Clock, AlertTriangle, RefreshCw, FileText } from 'lucide-react';
+import { Package, Truck, CheckCircle2, Clock, AlertTriangle, RefreshCw, FileText, ArrowRightLeft, Plus } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 import { fetchApi, postApi } from '../lib/api';
 
@@ -21,8 +21,23 @@ export default function StoreView({ user, lang, onToast }: StoreViewProps) {
 
   const [dispatchModal, setDispatchModal] = useState<{ code: string } | null>(null);
   const [courier, setCourier] = useState('Local Express Delivery');
+  const [storeTab, setStoreTab] = useState<'orders' | 'transfers'>('orders');
+  const [transfers, setTransfers] = useState<any[]>([]);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [reqMedId, setReqMedId] = useState(1);
+  const [reqQty, setReqQty] = useState(10);
+  const [fromStoreId, setFromStoreId] = useState(1);
 
   const t = (k: string) => translate(k, lang);
+
+  const loadTransfers = async () => {
+    try {
+      const data = await fetchApi('transfers');
+      setTransfers(data || []);
+    } catch {
+      setTransfers([]);
+    }
+  };
 
   const loadOrders = async () => {
     try {
@@ -38,7 +53,36 @@ export default function StoreView({ user, lang, onToast }: StoreViewProps) {
 
   useEffect(() => {
     loadOrders();
+    loadTransfers();
   }, []);
+
+  const handleRequestTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await postApi('transfers/request', {
+        to_store_id: user?.store_id || 1,
+        from_store_id: Number(fromStoreId),
+        med_id: Number(reqMedId),
+        qty: Number(reqQty),
+      });
+      onToast('Stock transfer requested from Central Warehouse / store');
+      setShowTransferModal(false);
+      loadTransfers();
+    } catch (err: any) {
+      onToast(err.message || 'Failed to request transfer');
+    }
+  };
+
+  const handleFulfillTransfer = async (tid: number) => {
+    try {
+      await postApi(`transfers/${tid}/fulfill`);
+      onToast('Stock transfer dispatched and inventory updated');
+      loadTransfers();
+      loadOrders();
+    } catch (err: any) {
+      onToast(err.message || 'Failed to fulfill transfer');
+    }
+  };
 
   const handlePack = (code: string) => {
     setPackModal({ code });
@@ -92,16 +136,105 @@ export default function StoreView({ user, lang, onToast }: StoreViewProps) {
             Store: <strong className="text-slate-800">{user?.store_name || user?.name || 'Local Store'}</strong> • Picking, Packing & Courier Handover
           </p>
         </div>
-        <button
-          onClick={loadOrders}
-          className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors self-start sm:self-auto"
-          title="Refresh Orders"
-        >
-          <RefreshCw className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Sub-tab Pill Navigation */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setStoreTab('orders')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                storeTab === 'orders' ? 'bg-white text-teal-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Fulfillment Queue ({orders.length})
+            </button>
+            <button
+              onClick={() => { setStoreTab('transfers'); loadTransfers(); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                storeTab === 'transfers' ? 'bg-white text-teal-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              Stock Transfers ({transfers.filter(t => t.status === 'requested').length})
+            </button>
+          </div>
+
+          <button
+            onClick={() => { loadOrders(); loadTransfers(); }}
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
-      {loading && orders.length === 0 ? (
+      {storeTab === 'transfers' ? (
+        /* Inter-Store Stock Transfers View */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <ArrowRightLeft className="w-5 h-5 text-teal-700" />
+                Inter-Store & Central Warehouse Requisitions
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Transfer inventory between 46 neighborhood locations and Central Warehouse to prevent customer drop-off.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowTransferModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-xs transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Request Stock Transfer
+            </button>
+          </div>
+
+          {transfers.length === 0 ? (
+            <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500">
+              No stock transfers recorded yet. Use the button above to request stock from the Central Warehouse.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {transfers.map((tr) => (
+                <div key={tr.id} className="p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{tr.med_name || 'Prescription Medicine'}</h4>
+                      <span className="text-xs text-slate-500">Qty: <strong className="text-slate-800">{tr.qty} units</strong></span>
+                    </div>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      tr.status === 'fulfilled' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800 animate-pulse'
+                    }`}>
+                      {tr.status.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">From:</span>
+                      <strong className="text-slate-700">{tr.from_store || 'Central Warehouse'}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">To:</span>
+                      <strong className="text-teal-800">{tr.to_store || 'Local Store'}</strong>
+                    </div>
+                  </div>
+
+                  {tr.status === 'requested' && (
+                    <button
+                      onClick={() => handleFulfillTransfer(tr.id)}
+                      className="w-full py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-xs transition"
+                    >
+                      Dispatch & Update Inventory
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : loading && orders.length === 0 ? (
         <div className="text-center py-12 text-slate-500">Loading store orders...</div>
       ) : orders.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 flex flex-col items-center justify-center space-y-4 text-center">
@@ -256,6 +389,78 @@ export default function StoreView({ user, lang, onToast }: StoreViewProps) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Stock Transfer Request Modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
+            <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5 text-teal-700" />
+              Request Inter-Store Stock Requisition
+            </h3>
+            <p className="text-xs text-slate-500">
+              When a local store is stock-constrained, request immediate stock transfer from the Central Warehouse or neighboring Kolkata stores.
+            </p>
+
+            <form onSubmit={handleRequestTransfer} className="space-y-3 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Source Store / Hub</label>
+                <select
+                  value={fromStoreId}
+                  onChange={(e) => setFromStoreId(Number(e.target.value))}
+                  className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-teal-700"
+                >
+                  <option value={1}>Salt Lake Hub #1 (Central Stock)</option>
+                  <option value={2}>Behala Store #2</option>
+                  <option value={3}>Howrah Maidan Store #3</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Required Medicine</label>
+                <select
+                  value={reqMedId}
+                  onChange={(e) => setReqMedId(Number(e.target.value))}
+                  className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-teal-700"
+                >
+                  <option value={1}>Metformin 500 mg, strip of 15</option>
+                  <option value={2}>Telmisartan 40 mg, strip of 10</option>
+                  <option value={3}>Levothyroxine 50 mcg, bottle of 100</option>
+                  <option value={4}>Atorvastatin 10 mg, strip of 15</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Quantity Needed</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="500"
+                  value={reqQty}
+                  onChange={(e) => setReqQty(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 font-bold"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowTransferModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold bg-teal-800 hover:bg-teal-900 text-white rounded-xl shadow-xs transition"
+                >
+                  Submit Requisition
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
