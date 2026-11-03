@@ -5,3 +5,5 @@ cryptography
 pillow
 httpx
 pytest
+psycopg2-binary
+

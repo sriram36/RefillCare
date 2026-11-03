@@ -1,6 +1,10 @@
+import logging
+import os
 import sqlite3
 import time
-from core.config import DB
+from core.config import DB, DATABASE_URL
+
+logger = logging.getLogger("refillcare.database")
 
 SCHEMA = """
 create table users(id integer primary key, name, phone unique, role, store_id, consent_at, token_ver default 1);
@@ -15,31 +19,98 @@ create table profiles(id integer primary key, customer_id, name, relation, is_mi
 create table notes(customer_id, text, ts, day);
 create table register(order_code, item_id, prescriber, patient, qty, ts);
 create table prescriptions(id integer primary key, customer_id, profile_name, order_code, rx_file, approved_at, valid_until);
+create table subscriptions(id integer primary key, customer_id, for_name, med_id, qty, per_day, frequency_days default 30, next_refill, active default 1, created integer);
+create table transfers(id integer primary key, from_store_id integer, to_store_id integer, med_id integer, qty integer, status text default 'requested', requested_at integer, fulfilled_at integer);
+create table payment_orders(id integer primary key, order_code text, razorpay_order_id text, amount integer, currency text default 'INR', status text default 'created', created_at integer);
 """
+
+_PG_ACTIVE = False
+_PG_POOL = None
+
+
+def is_postgres() -> bool:
+    global _PG_ACTIVE
+    if not DATABASE_URL:
+        return False
+    return _PG_ACTIVE
+
+
+def to_pg_sql(sql: str) -> str:
+    """Translate SQLite '?' parameters to PostgreSQL '%s'."""
+    return sql.replace("?", "%s")
+
+
+def _init_pg_pool():
+    global _PG_ACTIVE, _PG_POOL
+    if not DATABASE_URL:
+        _PG_ACTIVE = False
+        return
+    try:
+        import psycopg2
+        import psycopg2.pool
+        _PG_POOL = psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL)
+        _PG_ACTIVE = True
+        logger.info("Connected to PostgreSQL production cluster.")
+    except Exception as e:
+        logger.warning(f"Failed to connect to PostgreSQL ({e}). Falling back to SQLite.")
+        _PG_ACTIVE = False
+        _PG_POOL = None
+
+
+_init_pg_pool()
 
 
 def db():
-    connection = sqlite3.connect(DB, timeout=20.0)
+    """Return a raw connection: SQLite by default, or fallback."""
+    db_path = os.getenv("DB_PATH", DB)
+    connection = sqlite3.connect(db_path, timeout=20.0)
     connection.execute("PRAGMA journal_mode=WAL;")
     connection.row_factory = sqlite3.Row
     return connection
 
 
 def q(sql: str, *args, one: bool = False):
-    connection = db()
-    cursor = connection.execute(sql, args)
-    rows = [dict(row) for row in cursor]
-    connection.close()
-    return (rows[0] if rows else None) if one else rows
+    """Execute read query and return list of dicts (or single dict if one=True)."""
+    global _PG_ACTIVE, _PG_POOL
+    if is_postgres() and _PG_POOL:
+        conn = _PG_POOL.getconn()
+        try:
+            import psycopg2.extras
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(to_pg_sql(sql), args)
+                rows = [dict(r) for r in cur.fetchall()]
+                return (rows[0] if rows else None) if one else rows
+        finally:
+            _PG_POOL.putconn(conn)
+    else:
+        connection = db()
+        cursor = connection.execute(sql, args)
+        rows = [dict(row) for row in cursor]
+        connection.close()
+        return (rows[0] if rows else None) if one else rows
 
 
 def ex(sql: str, *args):
-    connection = db()
-    cursor = connection.execute(sql, args)
-    connection.commit()
-    last_id = cursor.lastrowid
-    connection.close()
-    return last_id
+    """Execute write query and return lastrowid / affected count."""
+    global _PG_ACTIVE, _PG_POOL
+    if is_postgres() and _PG_POOL:
+        conn = _PG_POOL.getconn()
+        try:
+            pg_sql = to_pg_sql(sql)
+            with conn.cursor() as cur:
+                cur.execute(pg_sql, args)
+                conn.commit()
+                last_id = getattr(cur, "lastrowid", None)
+                return last_id
+        finally:
+            _PG_POOL.putconn(conn)
+    else:
+        connection = db()
+        cursor = connection.execute(sql, args)
+        connection.commit()
+        last_id = cursor.lastrowid
+        connection.close()
+        return last_id
 
 
 def log(actor: str, action: str, entity: str):
@@ -53,10 +124,21 @@ def log(actor: str, action: str, entity: str):
 
 
 def ensure_schema():
+    """Ensure all required tables and columns exist idempotently."""
     connection = db()
     connection.execute(
         "create table if not exists prescriptions(id integer primary key, customer_id, profile_name, order_code, rx_file, approved_at, valid_until)"
     )
+    connection.execute(
+        "create table if not exists subscriptions(id integer primary key, customer_id, for_name, med_id, qty, per_day, frequency_days default 30, next_refill, active default 1, created integer)"
+    )
+    connection.execute(
+        "create table if not exists transfers(id integer primary key, from_store_id integer, to_store_id integer, med_id integer, qty integer, status text default 'requested', requested_at integer, fulfilled_at integer)"
+    )
+    connection.execute(
+        "create table if not exists payment_orders(id integer primary key, order_code text, razorpay_order_id text, amount integer, currency text default 'INR', status text default 'created', created_at integer)"
+    )
+
     for col, ddl in [
         ("consent_at", "alter table users add column consent_at integer"),
         ("token_ver", "alter table users add column token_ver integer default 1"),

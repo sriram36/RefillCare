@@ -16,6 +16,7 @@ if os.path.exists(_env_path):
                 if _k and _k not in os.environ:
                     os.environ[_k] = _v
 
+DATABASE_URL = os.getenv("DATABASE_URL")
 DB = os.getenv("DB_PATH", os.path.join(BASE_DIR, "pharmacy.db"))
 SECRET = os.getenv("APP_SECRET", "dev-only-secret")
 FKEY = os.getenv("RX_ENC_KEY") or base64.urlsafe_b64encode(
@@ -23,6 +24,15 @@ FKEY = os.getenv("RX_ENC_KEY") or base64.urlsafe_b64encode(
 )
 STORE = os.getenv("RX_STORE_PATH", os.path.join(BASE_DIR, "rx_store"))
 os.makedirs(STORE, exist_ok=True)
+
+# Cloud Storage Configuration (Azure Blob / S3)
+AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+AZURE_STORAGE_CONTAINER = os.getenv("AZURE_STORAGE_CONTAINER", "prescriptions")
+AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
+
+# Payment Gateway Configuration (Razorpay)
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "rzp_test_refillcare_demo")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "refillcare_secret_demo")
 
 AREAS = {
     "Park Street": (22.5535, 88.3520),
@@ -37,4 +47,3 @@ AZURE_DEPLOY = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-5.6-luna")
 
 # Allowed CORS origins (comma-separated list, e.g. "http://localhost:3000,https://my-app.vercel.app")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
-

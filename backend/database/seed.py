@@ -11,7 +11,8 @@ from services.ocr import demo_png
 
 
 def init():
-    if os.path.exists(DB):
+    actual_db = os.getenv("DB_PATH", DB)
+    if os.path.exists(actual_db):
         ensure_schema()
         return
 
@@ -120,15 +121,19 @@ def init():
     connection.commit()
     connection.close()
     ensure_schema()
+    seed_images()
 
 
 def seed_images():
     # sample orders get a synthetic prescription so the side-by-side screen is never empty
     samples = [("RX-50211", "s50211"), ("RX-50214", "s50214"), ("RX-50219", "blurry")]
+    store_dir = os.getenv("RX_STORE_PATH", STORE)
+    os.makedirs(store_dir, exist_ok=True)
     for code, kind in samples:
         o = q("select rx_file from orders where code = ?", code, one=True)
         if o and not o["rx_file"]:
             enc = Fernet(FKEY).encrypt(demo_png(kind))
-            with open(f"{STORE}/{code}.enc", "wb") as enc_file:
+            out_file = os.path.join(store_dir, f"{code}.enc")
+            with open(out_file, "wb") as enc_file:
                 enc_file.write(enc)
             ex("update orders set rx_file = ? where code = ?", f"{code}.enc", code)
