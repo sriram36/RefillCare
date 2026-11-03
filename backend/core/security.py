@@ -41,6 +41,8 @@ def tok(uid: int, token_ver: int = 1, exp: int | None = None) -> str:
 
 def auth(authorization: str = Header("")):
     try:
+        if authorization.startswith("Bearer "):
+            authorization = authorization[7:].strip()
         parts = authorization.split(".")
         if len(parts) == 3:
             uid, exp, sig = parts

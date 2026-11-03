@@ -58,6 +58,13 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
 
   useEffect(() => {
     loadData();
+    // Poll orders every 10 seconds to update live timeline
+    const interval = setInterval(() => {
+      fetchApi('orders')
+        .then(os => setOrders(os))
+        .catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // Search handler

@@ -6,7 +6,7 @@ import {
   Upload, BellRing, RefreshCw, CheckCircle2, TrendingUp, ArrowLeft
 } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
-import { fetchApi, postApi, API_BASE, getToken } from '../lib/api';
+import { fetchApi, postApi, buildApiUrl, getToken } from '../lib/api';
 
 interface DashboardViewProps {
   user: any;
@@ -53,7 +53,7 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
       formData.append('file', stockFile);
 
       const token = getToken();
-      const res = await fetch(`${API_BASE}/api/stock`, {
+      const res = await fetch(buildApiUrl('stock'), {
         method: 'POST',
         headers: token ? { Authorization: token } : {},
         body: formData,

@@ -19,7 +19,8 @@ create table prescriptions(id integer primary key, customer_id, profile_name, or
 
 
 def db():
-    connection = sqlite3.connect(DB)
+    connection = sqlite3.connect(DB, timeout=20.0)
+    connection.execute("PRAGMA journal_mode=WAL;")
     connection.row_factory = sqlite3.Row
     return connection
 

@@ -6,7 +6,7 @@ import {
   Sparkles, RefreshCw, Eye, ArrowRight, CornerDownRight, Check
 } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
-import { fetchApi, postApi, getToken, API_BASE } from '../lib/api';
+import { fetchApi, postApi, getToken, buildApiUrl } from '../lib/api';
 
 interface PharmacistViewProps {
   user: any;
@@ -90,7 +90,7 @@ export default function PharmacistView({ user, lang, onToast, onOpenDashboard }:
       setRxLoading(true);
       try {
         const token = getToken();
-        const res = await fetch(`${API_BASE}/api/orders/${selectedOrder.code}/rx`, {
+        const res = await fetch(buildApiUrl(`orders/${selectedOrder.code}/rx`), {
           headers: token ? { Authorization: token } : {}
         });
         if (res.ok) {
