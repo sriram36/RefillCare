@@ -21,6 +21,7 @@ export default function PharmacistView({ user, lang, onToast, onOpenDashboard }:
   const [loading, setLoading] = useState(true);
   const [rxImageUrl, setRxImageUrl] = useState<string | null>(null);
   const [rxLoading, setRxLoading] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
 
@@ -72,6 +73,7 @@ export default function PharmacistView({ user, lang, onToast, onOpenDashboard }:
 
   // When selected order changes, load prescription image and DPDP audit logs
   useEffect(() => {
+    setZoomLevel(1);
     if (!selectedOrder) {
       setRxImageUrl(null);
       setAuditLogs([]);
@@ -346,19 +348,62 @@ export default function PharmacistView({ user, lang, onToast, onOpenDashboard }:
                 
                 {/* Prescription Image Viewer */}
                 <div className="space-y-2">
-                  <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-teal-700" />
-                    Uploaded Prescription
-                  </h3>
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden min-h-[340px] flex items-center justify-center p-2 relative">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-teal-700" />
+                      <span>Encrypted Prescription</span>
+                    </h3>
+                    {rxImageUrl && (
+                      <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 text-xs shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => setZoomLevel(z => Math.max(0.7, +(z - 0.2).toFixed(1)))}
+                          className="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-100 font-bold text-slate-700"
+                          title="Zoom Out"
+                        >
+                          −
+                        </button>
+                        <span className="text-[11px] font-mono px-1 text-slate-600 font-medium">
+                          {Math.round(zoomLevel * 100)}%
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setZoomLevel(z => Math.min(2.5, +(z + 0.2).toFixed(1)))}
+                          className="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-100 font-bold text-slate-700"
+                          title="Zoom In"
+                        >
+                          +
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setZoomLevel(1)}
+                          className="px-1.5 py-0.5 rounded text-[10px] text-slate-500 hover:text-slate-800"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-900/5 border border-slate-200 rounded-2xl overflow-auto min-h-[360px] max-h-[520px] flex items-center justify-center p-3 relative">
                     {rxLoading ? (
-                      <div className="text-xs text-slate-400 animate-pulse">Decrypting and loading image...</div>
+                      <div className="text-xs text-slate-500 animate-pulse flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
+                        <span>Decrypting prescription (AES-128)...</span>
+                      </div>
                     ) : rxImageUrl ? (
-                      <img
-                        src={rxImageUrl}
-                        alt="Prescription"
-                        className="w-full h-auto max-h-[500px] object-contain rounded-lg border border-slate-200 bg-white"
-                      />
+                      <div className="overflow-auto max-w-full max-h-full">
+                        <img
+                          src={rxImageUrl}
+                          alt="Prescription"
+                          style={{
+                            transform: `scale(${zoomLevel})`,
+                            transformOrigin: 'top center',
+                            transition: 'transform 0.15s ease-out'
+                          }}
+                          className="max-w-full h-auto object-contain rounded-xl shadow-xs border border-slate-200 bg-white"
+                        />
+                      </div>
                     ) : (
                       <div className="text-center p-6 text-slate-400 text-xs">
                         No prescription file stored for this order, or digital catalog order.

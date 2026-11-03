@@ -293,15 +293,36 @@ export default function StoreView({ user, lang, onToast }: StoreViewProps) {
             <p className="text-xs text-slate-600">
               Confirm courier or store delivery executive dispatching order {dispatchModal.code}.
             </p>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Courier / Delivery Partner</label>
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-700">Courier / Delivery Partner *</label>
               <input
                 type="text"
                 value={courier}
                 onChange={(e) => setCourier(e.target.value)}
                 placeholder="Courier name"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-700"
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700"
               />
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {[
+                  'Store Staff Express',
+                  'Bluedart Healthcare',
+                  'Local Courier',
+                  'Shadowfax Express'
+                ].map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setCourier(p)}
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
+                      courier === p
+                        ? 'bg-blue-50 border-blue-300 text-blue-800 font-bold'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Pill, Users, ShieldCheck, Store, BarChart3, Bell, CheckCircle } from 'lucide-react';
+import { Pill, Users, ShieldCheck, Store, BarChart3, Bell, CheckCircle, Sparkles, Shield, Clock } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 import { getUser, setUser as setStoredUser, setToken, postApi } from '../lib/api';
 import Header from '../components/Header';
@@ -37,7 +37,7 @@ export default function Home() {
     setToastMsg(msg);
     setTimeout(() => {
       setToastMsg((prev) => (prev === msg ? null : prev));
-    }, 4000);
+    }, 4500);
   };
 
   const handleLangChange = (newLang: Language) => {
@@ -69,13 +69,16 @@ export default function Home() {
   if (!mounted) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">
-        Loading RefillCare...
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xs font-medium">Loading RefillCare Network…</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-teal-100 selection:text-teal-900">
       {/* Sticky Header */}
       <Header
         user={user}
@@ -87,20 +90,36 @@ export default function Home() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
         
-        {/* If user is not authenticated: Show Sign In & Quick Demo Selectors */}
+        {/* If user is not authenticated: Show Sign In & Trust Badges */}
         {!user ? (
           <div className="space-y-8 py-6">
-            <div className="text-center max-w-2xl mx-auto space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-semibold">
-                <Pill className="w-3.5 h-3.5" />
+            <div className="text-center max-w-3xl mx-auto space-y-4">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold shadow-2xs">
+                <Sparkles className="w-3.5 h-3.5 text-teal-600" />
                 RefillCare • 46 Stores Across Kolkata & Howrah
               </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
                 Monthly Medicine Refills in 60 Seconds
               </h1>
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-                Same-day delivery from your nearest neighborhood pharmacy. Safe prescription verification by registered pharmacists, automated generic savings, and timely refill reminders.
+              <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
+                Rapid prescription verification by licensed pharmacists, bioequivalent generic savings under Pradhan Mantri Janaushadhi guidelines, and same-day delivery from your nearest neighborhood pharmacy.
               </p>
+
+              {/* Trust Value Badges */}
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs font-semibold text-slate-700">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 shadow-2xs">
+                  <Shield className="w-3.5 h-3.5 text-teal-700" />
+                  WBMC Registered Pharmacists
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 shadow-2xs">
+                  <Clock className="w-3.5 h-3.5 text-teal-700" />
+                  &lt; 10 Min Verification SLA
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 shadow-2xs">
+                  <ShieldCheck className="w-3.5 h-3.5 text-teal-700" />
+                  DPDP Act 2023 Encrypted
+                </span>
+              </div>
             </div>
 
             <AuthModal
@@ -114,60 +133,60 @@ export default function Home() {
           <div className="space-y-6">
             
             {/* Navigation Tab Bar for Role Switching & Exploration */}
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 flex-wrap gap-3">
-              <div className="flex items-center gap-1 sm:gap-2 bg-slate-100 p-1 rounded-xl">
+            <div className="flex items-center justify-between border-b border-slate-200/80 pb-3 flex-wrap gap-3">
+              <div className="flex items-center gap-1 sm:gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
                 <button
                   onClick={() => setActiveTab('customer')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                     activeTab === 'customer'
-                      ? 'bg-white text-teal-900 shadow-xs'
+                      ? 'bg-white text-teal-950 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Users className="w-3.5 h-3.5" />
+                  <Users className="w-3.5 h-3.5 text-teal-700" />
                   Customer Portal
                 </button>
 
                 <button
                   onClick={() => setActiveTab('pharmacist')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                     activeTab === 'pharmacist'
-                      ? 'bg-white text-teal-900 shadow-xs'
+                      ? 'bg-white text-purple-950 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
                   Pharmacist Verification
                 </button>
 
                 <button
                   onClick={() => setActiveTab('store')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                     activeTab === 'store'
-                      ? 'bg-white text-teal-900 shadow-xs'
+                      ? 'bg-white text-blue-950 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Store className="w-3.5 h-3.5" />
+                  <Store className="w-3.5 h-3.5 text-blue-700" />
                   Store Fulfillment
                 </button>
 
                 <button
                   onClick={() => setActiveTab('dashboard')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                     activeTab === 'dashboard'
-                      ? 'bg-white text-teal-900 shadow-xs'
+                      ? 'bg-white text-teal-950 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <BarChart3 className="w-3.5 h-3.5" />
-                  Central Dashboard
+                  <BarChart3 className="w-3.5 h-3.5 text-teal-700" />
+                  Central Operations
                 </button>
               </div>
 
               {/* Status Pill indicating Active Role */}
-              <div className="text-xs text-slate-500">
-                Logged in as <strong className="text-slate-800">{user.name}</strong> ({user.role})
+              <div className="text-xs text-slate-500 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                Active Session: <strong className="text-slate-900 font-bold">{user.name}</strong> • <span className="capitalize text-teal-800 font-semibold">{user.role}</span>
               </div>
             </div>
 
@@ -205,17 +224,22 @@ export default function Home() {
 
       {/* Floating Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-medium text-white shadow-xl animate-in fade-in slide-in-from-bottom-2">
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-2xl bg-slate-900/95 px-5 py-3.5 text-xs font-semibold text-white shadow-2xl backdrop-blur-md border border-slate-700/50 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
           <span>{toastMsg}</span>
         </div>
       )}
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>© 2026 RefillCare • Kolkata & Howrah Pharmacy Network (46 Stores)</p>
-          <p className="text-slate-400">Compliant with Drugs & Cosmetics Act & DPDP Act 2023</p>
+      <footer className="border-t border-slate-200/80 bg-white py-6 text-center text-xs text-slate-500 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-700">RefillCare Healthcare</span>
+            <span>• 46 Pharmacy Locations in Kolkata & Howrah</span>
+          </div>
+          <p className="text-slate-400">
+            Compliant with Drugs & Cosmetics Act (Rule 65) & DPDP Act 2023
+          </p>
         </div>
       </footer>
     </div>
