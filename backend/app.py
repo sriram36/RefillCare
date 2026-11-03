@@ -22,8 +22,11 @@ from pydantic import BaseModel
 
 from rules import RX_VALID_DAYS, can_dispatch, route, rule
 
-# Auto-load .env file from project root if present
-_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+# Base directory of the backend module
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Auto-load .env file from backend directory if present
+_env_path = os.path.join(BASE_DIR, ".env")
 if os.path.exists(_env_path):
     with open(_env_path, "r", encoding="utf-8") as _f:
         for _line in _f:
@@ -34,15 +37,15 @@ if os.path.exists(_env_path):
                 if _k and _k not in os.environ:
                     os.environ[_k] = _v
 
-DB = os.getenv("DB_PATH", "pharmacy.db")
+DB = os.getenv("DB_PATH", os.path.join(BASE_DIR, "pharmacy.db"))
 SECRET = os.getenv("APP_SECRET", "dev-only-secret")
 FKEY = os.getenv("RX_ENC_KEY") or base64.urlsafe_b64encode(
     hashlib.sha256(SECRET.encode()).digest()
 )
-STORE = "rx_store"
+STORE = os.getenv("RX_STORE_PATH", os.path.join(BASE_DIR, "rx_store"))
 os.makedirs(STORE, exist_ok=True)
 
-app = FastAPI(title="Pharmacy reorder")
+app = FastAPI(title="RefillCare API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -50,7 +53,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 AREAS = {
     "Park Street": (22.5535, 88.3520),
@@ -169,7 +171,8 @@ def init():
         ],
     )
 
-    with open("data/stock.csv") as stock_file:
+    stock_csv_path = os.path.join(BASE_DIR, "data", "stock.csv")
+    with open(stock_csv_path, encoding="utf-8") as stock_file:
         for r in csv.DictReader(stock_file):
             connection.execute(
                 "insert into stock values(?, ?, ?)",
@@ -1437,8 +1440,19 @@ def run_reminders(u=Depends(auth)):
 
 
 @app.get("/")
-def home():
-    return FileResponse("static/index.html")
+def root():
+    return {
+        "service": "RefillCare API",
+        "status": "healthy",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "endpoints": {
+            "auth": "/api/login",
+            "orders": "/api/orders",
+            "refills": "/api/refills",
+            "dashboard": "/api/dashboard",
+        },
+    }
 
 
 def seed_images():

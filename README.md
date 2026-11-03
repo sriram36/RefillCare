@@ -7,20 +7,50 @@ A reliable, privacy-first online pharmacy reordering and verification platform d
 
 ---
 
+## Repository Structure
+
+```
+RefillCare/
+├── backend/                  # FastAPI Python backend service
+│   ├── app.py                # Main API application & route handlers
+│   ├── rules.py              # Pure regulatory safety engine (Schedule H/H1, routing)
+│   ├── requirements.txt      # Python dependencies
+│   ├── Dockerfile            # Backend container configuration
+│   ├── data/                 # Sample daily stock CSV
+│   ├── tests/                # 20 automated unit & safety gate tests
+│   └── .env.example          # Backend environment variable template
+├── frontend/                 # Dedicated Next.js 14 App Router client
+│   ├── app/                  # Next.js App Router root layout & main page
+│   ├── components/           # Role-specific React components
+│   ├── lib/                  # API client & trilingual dictionaries (EN, BN, HI)
+│   ├── package.json          # Node dependencies (React 18, Tailwind, Lucide)
+│   ├── tailwind.config.js    # Healthcare palette & styling tokens
+│   └── .env.example          # Frontend environment variable template
+├── docs/                     # Documentation & technical specifications
+│   ├── PRD.md & PRD.pdf      # Product Requirements Document
+│   ├── TDD.md & TDD.pdf      # Technical Design Document
+│   └── deployment.md         # Full deployment & operations runbook
+├── Dockerfile                # Root Dockerfile for Render Web Service deployment
+├── docker-compose.yml        # Compose file for running full stack locally
+└── README.md                 # Project documentation
+```
+
+---
+
 ## Architecture Overview
 
-RefillCare is architected with a decoupled frontend and backend:
+RefillCare is cleanly organized into two decoupled services:
 
 1. **Modern Frontend (`/frontend`):**
    - **Stack:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons.
-   - **Experience:** Clean typography (Plus Jakarta Sans), high-contrast accessible states, calm healthcare aesthetics, instant role-switcher, and trilingual support (English, বাংলা, हिन्दी).
+   - **Design:** Clean typography (Plus Jakarta Sans), calm healthcare aesthetics, high-contrast accessible states, role switcher, and trilingual support (English, বাংলা, हिन्दी).
    - **Portals:**
-     - **Customer App:** 1-tap monthly medicine refills, active "Running Low" alerts, live search across 46 stores, prescription photo upload, 5-stage order tracking, and DPDP Act data rights.
-     - **Pharmacist Queue:** Side-by-side sticky prescription viewer and AI draft match lines, Schedule H1 regulatory register modal, rejection with mandatory reason, generic savings offer.
+     - **Customer App:** 1-tap monthly refills, active "Running Low" chips (&le;5 days supply), live search across 46 stores, prescription photo upload, 5-stage order tracking, and DPDP Act data rights.
+     - **Pharmacist Queue:** Side-by-side sticky prescription viewer and AI draft match lines, Schedule H1 regulatory register modal, rejection with mandatory reason, and generic savings offer.
      - **Store Staff Screen:** Store-scoped pick and pack workflow with hard regulatory gate preventing dispatch until pharmacist approval, invoice entry, and courier handover.
      - **Central Operations Dashboard:** Real-time metrics across 46 stores, median verification SLA tracker (< 10 min benchmark), low-stock inventory alerts (&le; 5 units), daily stock CSV sync, and automated refill reminders trigger.
 
-2. **Backend API (`app.py`, `rules.py`):**
+2. **Backend API (`/backend`):**
    - **Stack:** FastAPI, Python 3.12, SQLite, Fernet AES-128 encryption.
    - **Compliance:**
      - Drugs and Cosmetics Act & Rules: Schedule H and H1 medicines require registered pharmacist approval; Schedule X and narcotic items are strictly prohibited online; Schedule H1 sales are logged to a statutory register.
@@ -32,11 +62,23 @@ RefillCare is architected with a decoupled frontend and backend:
 
 ## Quickstart
 
-### 1. Backend Setup
+### Option A: Run Full Stack via Docker Compose
 ```bash
-# Clone the repository
 git clone https://github.com/sriram36/RefillCare.git
 cd RefillCare
+
+docker compose up --build
+```
+- Frontend: `http://localhost:3000`
+- Backend API & Interactive Docs: `http://localhost:8000/docs`
+
+---
+
+### Option B: Run Locally Without Docker
+
+#### 1. Start Backend
+```bash
+cd backend
 
 # Create and activate virtual environment
 # Windows:
@@ -54,7 +96,7 @@ python -m uvicorn app:app --port 8000 --reload
 ```
 The SQLite database and sample seed data (46 stores, sample patients, medicines, and encrypted demo prescriptions) are created automatically on first run.
 
-### 2. Modern Next.js Frontend Setup
+#### 2. Start Frontend
 ```bash
 cd frontend
 npm install
@@ -84,33 +126,18 @@ All test accounts authenticate using OTP: **`123456`**.
 
 ```bash
 # 1. Backend safety gate & business rule tests (20 tests passed)
-python -m pytest -q
+cd backend
+python -m pytest tests -q
 
 # 2. Frontend production build & typecheck
 cd frontend
 npm run build
-
-# 3. Simulated DOM UI smoke test
-node tests/ui_smoke.js
 ```
 
 ---
 
-## Deployment & Docker
+## Deployment
 
-- **Docker:** The backend container automatically seeds the database on first boot.
-  ```bash
-  docker build -t refillcare-backend .
-  docker run -p 8000:8000 -e APP_SECRET="your-strong-random-secret" refillcare-backend
-  ```
-- **Render Backend Deployment:** Pre-configured Docker deployment targeting `https://refillcare.onrender.com`.
+- **Render Backend Deployment (Docker):** Pre-configured root `Dockerfile` and `backend/Dockerfile` targeting `https://refillcare.onrender.com`.
 - **Vercel / Render Frontend Deployment:** Connect `/frontend` directory with environment variable `NEXT_PUBLIC_API_URL=https://refillcare.onrender.com`.
-- See detailed instructions in **[deployment.md](deployment.md)**.
-
----
-
-## Documentation
-- [Product Requirements Document (PRD.md)](PRD.md)
-- [Technical Design Document (TDD.md)](TDD.md)
-- [Deployment Guide (deployment.md)](deployment.md)
-- [Frontend Documentation (frontend/README.md)](frontend/README.md)
+- See full step-by-step instructions in **[docs/deployment.md](docs/deployment.md)**.

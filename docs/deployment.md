@@ -150,20 +150,15 @@ All accounts use the demo OTP: `123456`
 
 ---
 
-## 7. Verification & Smoke Testing
+## 7. Verification & Testing
 
 ### Backend Unit & Integration Tests (20/20)
 ```bash
-python -m pytest -q
+python -m pytest backend/tests -q
 ```
 
 ### Frontend Production Build
 ```bash
 cd frontend
 npm run build
-```
-
-### End-to-End JSDOM Smoke Test
-```bash
-node tests/ui_smoke.js
 ```
