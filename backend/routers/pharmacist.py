@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from core.config import STORE
-from core.crypto import read_encrypted_prescription
+from core.storage import get_decrypted_rx
 from core.security import auth, need
 from database.session import ex, log, q
 from rules import RX_VALID_DAYS, rule
@@ -32,7 +32,7 @@ def get_rx_image(code: str, u=Depends(auth)):
     if not o or not o["rx_file"]:
         raise HTTPException(404, "No prescription image on file")
     try:
-        decrypted_bytes = read_encrypted_prescription(o["rx_file"])
+        decrypted_bytes = get_decrypted_rx(o["rx_file"])
     except FileNotFoundError:
         raise HTTPException(404, "Prescription file not found on disk")
     log(u["name"], "view_rx", code)
@@ -46,10 +46,9 @@ def get_order_audit(code: str, u=Depends(auth)):
     if not o:
         raise HTTPException(404, "Order not found")
     logs = q(
-        "select * from audit where entity = ? or entity like ? or (action in ('view_rx', 'upload_rx', 'reupload_rx', 'ask_reupload') and entity = ?) order by ts desc",
+        "select * from audit where entity = ? or entity like ? order by ts desc",
         code,
         f"%{code}%",
-        code,
     )
     return logs
 
@@ -85,7 +84,11 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
         # Step 2: Prescription validation for prescription-only (Rx) items
         if rule(item["schedule"])["rx"]:
             today_str = date.today().isoformat()
-            has_order_file = bool(order["rx_file"] and os.path.exists(os.path.join(STORE, order["rx_file"])))
+            store_dir = os.getenv("RX_STORE_PATH", STORE)
+            has_order_file = bool(order["rx_file"] and (
+                os.path.exists(os.path.join(store_dir, order["rx_file"])) or
+                os.path.exists(os.path.join(STORE, order["rx_file"]))
+            ))
             valid_record = q(
                 "select * from prescriptions where customer_id = ? and profile_name = ? and valid_until >= ? order by valid_until desc limit 1",
                 order["customer_id"],
@@ -144,6 +147,7 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
                 qty,
                 int(time.time()),
             )
+
         ex(
             "update items set status = 'approved', approved_by = ?, qty = ? where id = ?",
             u["id"],

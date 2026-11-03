@@ -1,13 +1,18 @@
 import base64
 import io
 import json
+import logging
 import os
 from PIL import Image, ImageDraw, ImageFilter
 from core.config import AZURE_ENDPOINT, AZURE_KEY, AZURE_DEPLOY
+from rules import validate_doctor_reg
+
+logger = logging.getLogger("refillcare.ocr")
 
 DEMOS = {
     "clean": {
         "legible": True,
+        "doctor": {"name": "Dr. A. Banerjee", "reg": "WBMC-12345"},
         "lines": [
             {"text": "Metformin 500 mg", "qty": 4, "conf": 0.98},
             {"text": "Telmisartan 40 mg", "qty": 3, "conf": 0.97},
@@ -15,17 +20,28 @@ DEMOS = {
     },
     "handwritten": {
         "legible": True,
+        "doctor": {"name": "Dr. S. Mukherjee", "reg": "WBMC-49281"},
         "lines": [{"text": "Levothyroxin 50 mcg", "qty": 1, "conf": 0.54}],
     },
-    "blurry": {"legible": False, "lines": []},
-    "s50211": {"legible": True, "lines": [{"text": "Metformin 500 mg", "qty": 4}]},
-    "s50214": {"legible": True, "lines": [{"text": "Telmisartan 40 mg", "qty": 3}]},
+    "blurry": {"legible": False, "lines": [], "doctor": None},
+    "s50211": {
+        "legible": True,
+        "doctor": {"name": "Dr. A. Banerjee", "reg": "WBMC-12345"},
+        "lines": [{"text": "Metformin 500 mg", "qty": 4}],
+    },
+    "s50214": {
+        "legible": True,
+        "doctor": {"name": "Dr. K. Sen", "reg": "WBMC-34190"},
+        "lines": [{"text": "Telmisartan 40 mg", "qty": 3}],
+    },
     "h1": {
         "legible": True,
+        "doctor": {"name": "Dr. P. Mukherjee", "reg": "WBMC-49281"},
         "lines": [{"text": "Alprazolam 0.25 mg", "qty": 1, "conf": 0.93}],
     },
     "schedx": {
         "legible": True,
+        "doctor": {"name": "Dr. Unknown", "reg": ""},
         "lines": [
             {"text": "Demo Narcotic 5 mg", "qty": 1, "conf": 0.90},
             {"text": "Paracetamol 500 mg", "qty": 2, "conf": 0.95},
@@ -34,12 +50,19 @@ DEMOS = {
 }
 
 PROMPT = (
-    "Read this prescription. Return JSON {legible:bool, lines:[{text,qty,conf}]} with conf 0-1. "
-    "Never guess unreadable text. No medical advice."
+    "You are a clinical pharmacist AI assistant reviewing Indian medical prescriptions for Company A (Kolkata). "
+    "Read the prescription carefully and extract structured JSON with schema: "
+    "{"
+    "  \"legible\": bool, "
+    "  \"doctor_name\": str, "
+    "  \"doctor_reg\": str, "
+    "  \"lines\": [{\"text\": str, \"qty\": int, \"conf\": float}]"
+    "} "
+    "Where conf is a float between 0.0 and 1.0. Never guess unreadable text. Do not provide medical diagnosis or advice."
 )
 
 
-def azure_ocr(raw: bytes):
+def azure_ocr(raw: bytes) -> dict:
     import httpx
 
     ep = AZURE_ENDPOINT
@@ -63,17 +86,21 @@ def azure_ocr(raw: bytes):
         },
     )
     r.raise_for_status()
-    return json.loads(r.json()["choices"][0]["message"]["content"])
+    parsed = json.loads(r.json()["choices"][0]["message"]["content"])
+    if parsed.get("doctor_reg"):
+        parsed["doctor_validation"] = validate_doctor_reg(parsed["doctor_reg"])
+    return parsed
 
 
-def extract(raw: bytes, demo: str):
+def extract(raw: bytes, demo: str) -> dict:
     if AZURE_ENDPOINT and AZURE_KEY:
         try:
             return azure_ocr(raw)
         except Exception as e:
-            print(f"[azure] extraction failed: {e}", flush=True)
-            return {"legible": None, "lines": []}  # Fallback to manual pharmacist review
-    return DEMOS.get(demo, {"legible": None, "lines": []})
+            logger.warning(f"Azure OCR extraction failed: {e}. Falling back to demo/pharmacist review.")
+            return {"legible": None, "lines": [], "doctor": None}
+    demo_data = DEMOS.get(demo, {"legible": None, "lines": [], "doctor": None})
+    return demo_data
 
 
 def demo_png(kind: str) -> bytes:
@@ -81,8 +108,8 @@ def demo_png(kind: str) -> bytes:
         return b""
     im = Image.new("RGB", (560, 380), "white")
     draw = ImageDraw.Draw(im)
-    draw.text((20, 20), "Dr. A. Banerjee, Reg. No. WB-12345 (sample)", fill="black")
-    lines = DEMOS[kind]["lines"] or [{"text": "illegible"}]
+    draw.text((20, 20), "Dr. A. Banerjee, Reg. No. WB-12345 (WBMC)", fill="black")
+    lines = DEMOS[kind].get("lines") or [{"text": "illegible"}]
     for i, line in enumerate(lines):
         draw.text(
             (30, 80 + i * 40),

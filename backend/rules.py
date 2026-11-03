@@ -1,6 +1,7 @@
 """Pure business rules: no DB, easy to test. Rules are config (brief: online-pharmacy rules not final)."""
 
 import math
+import re
 
 # ASSUMPTION: The brief provides no prescription validity period; 180 days is assumed for chronic refills.
 RX_VALID_DAYS = 180
@@ -17,6 +18,42 @@ RULES = {
 def rule(schedule: str) -> dict:
     """Unknown schedule is treated as prescription-only Schedule H."""
     return RULES.get(schedule, RULES["H"])
+
+
+def validate_doctor_reg(reg_no: str) -> dict:
+    """
+    Validate Indian doctor registration number format (WBMC, NMC, MCI, DMC, MMC).
+    Returns {"valid": bool, "council": str, "reg_number": str, "formatted": str}
+    """
+    if not reg_no or not isinstance(reg_no, str):
+        return {"valid": False, "council": "Unknown", "reg_number": "", "formatted": ""}
+
+    clean = reg_no.strip().upper()
+    if len(clean) < 3:
+        return {"valid": False, "council": "Unknown", "reg_number": clean, "formatted": clean}
+
+    council = "State Medical Council"
+    if "WBMC" in clean or clean.startswith("WB"):
+        council = "West Bengal Medical Council (WBMC)"
+    elif "NMC" in clean or "MCI" in clean:
+        council = "National Medical Commission (NMC)"
+    elif "MMC" in clean:
+        council = "Maharashtra Medical Council (MMC)"
+    elif "DMC" in clean:
+        council = "Delhi Medical Council (DMC)"
+
+    digits = re.findall(r"\d+", clean)
+    if digits:
+        reg_num = "".join(digits)
+        valid = len(reg_num) >= 3
+        return {
+            "valid": valid,
+            "council": council,
+            "reg_number": reg_num,
+            "formatted": f"{council} #{reg_num}",
+        }
+
+    return {"valid": False, "council": council, "reg_number": clean, "formatted": clean}
 
 
 def can_dispatch(items: list[dict]) -> tuple[bool, str]:
