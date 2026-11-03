@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { ShieldCheck, BarChart3, CheckCircle, Sparkles, Shield, Clock } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 import { getUser, setUser as setStoredUser, setToken, postApi } from '../lib/api';
@@ -209,11 +210,20 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-700">RefillCare Healthcare</span>
-            <span>• 46 Pharmacy Locations in Kolkata &amp; Howrah</span>
+            <span>•</span>
+            <Link href="/stores" className="text-teal-800 hover:underline font-semibold">
+              46 Pharmacy Locations in Kolkata &amp; Howrah
+            </Link>
           </div>
-          <p className="text-slate-400">
-            Compliant with Drugs &amp; Cosmetics Act (Rule 65) &amp; DPDP Act 2023
-          </p>
+          <div className="flex items-center gap-3">
+            <Link href="/compliance" className="text-slate-600 hover:text-teal-800 font-semibold hover:underline">
+              DPDP Act (2023) &amp; Rule 65 Compliance
+            </Link>
+            <span>•</span>
+            <Link href="/stores" className="text-slate-600 hover:text-teal-800 font-semibold hover:underline">
+              Store Locator
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

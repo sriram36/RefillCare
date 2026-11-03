@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Pill, LogOut, Globe, Shield, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { Pill, LogOut, Globe, Shield, Sparkles, Building2 } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 
 interface HeaderProps {
@@ -30,13 +31,13 @@ export default function Header({ user, lang, onLangChange, onLogout }: HeaderPro
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between border-b border-slate-200/80 bg-white/95 px-4 sm:px-8 py-3.5 shadow-xs backdrop-blur-md">
       {/* Brand logo & live network status */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-teal-800 to-teal-600 text-white shadow-sm">
+      <Link href="/" className="flex items-center gap-3 group">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-teal-800 to-teal-600 text-white shadow-sm group-hover:scale-105 transition">
           <Pill className="h-5 w-5" />
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-extrabold tracking-tight text-slate-900">
+            <span className="text-lg font-extrabold tracking-tight text-slate-900 group-hover:text-teal-800 transition">
               {t('app_title')}
             </span>
             <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
@@ -48,7 +49,31 @@ export default function Header({ user, lang, onLangChange, onLogout }: HeaderPro
             Kolkata & Howrah Chronic Pharmacy Network
           </p>
         </div>
-      </div>
+      </Link>
+
+      {/* Center Nav Links */}
+      <nav className="hidden lg:flex items-center gap-1 bg-slate-100/80 p-1 rounded-2xl text-xs font-bold text-slate-600">
+        <Link
+          href="/"
+          className="px-3.5 py-1.5 rounded-xl hover:text-teal-900 hover:bg-white/80 transition"
+        >
+          Reorder Home
+        </Link>
+        <Link
+          href="/stores"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl hover:text-teal-900 hover:bg-white/80 transition"
+        >
+          <Building2 className="w-3.5 h-3.5 text-teal-700" />
+          <span>46 Stores Directory</span>
+        </Link>
+        <Link
+          href="/compliance"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl hover:text-teal-900 hover:bg-white/80 transition"
+        >
+          <Shield className="w-3.5 h-3.5 text-teal-700" />
+          <span>DPDP &amp; Rule 65</span>
+        </Link>
+      </nav>
 
       {/* Right Actions: Language & User */}
       <div className="flex items-center gap-3">
