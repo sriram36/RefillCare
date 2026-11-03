@@ -69,7 +69,7 @@ Open `http://localhost:8000/docs` to explore the OpenAPI documentation.
    - **Name:** `refillcare` (or `refillcare-backend`)
    - **Region:** Singapore or Oregon
    - **Branch:** `main`
-   - **Root Directory:** `backend` (or set Dockerfile Path to `backend/Dockerfile`)
+   - **Root Directory:** Leave empty (uses root `Dockerfile`) or set to `backend` (uses `backend/Dockerfile`)
    - **Environment / Language:** `Docker`
    - **Plan:** Free ($0/month) or Starter ($7/month)
 4. **Environment Variables:**
