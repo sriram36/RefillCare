@@ -25,6 +25,10 @@ Reviewers can verify the core regulatory gates and workflows in under 3 minutes 
 3. **Inspect the Executive Dashboard**
    - Click the **Central Operations** tab in the top header.
    - View real-time fulfillment KPIs across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), verification SLA (< 10 min vs target), stock levels, and drop-off prevention metrics.
+4. **Test Prescription OCR & AI Vision Parsing**
+   - Sign in as **Customer (Debasish Ghosh)** (`9000000001`).
+   - In the **Upload Prescription** section, choose a verified demo chip (e.g. *Clear Printed*, *Handwritten Rx*, *Blurry Photo*, or *Schedule X*) or upload any PNG/JPEG image file.
+   - Click **Submit Prescription Order**, then switch to **Anita Rao (Pharmacist)** (`9000000099`) to view the extracted medicines with confidence ratings and side-by-side image verification. Blurry images automatically go *On Hold*, and Schedule X items are automatically flagged *Rejected*.
 
 ---
 
@@ -98,9 +102,12 @@ Open `http://localhost:8000/docs` to explore the OpenAPI documentation.
 4. **Environment Variables:**
    - `APP_SECRET`: `<generate a long random value; never commit it>`
    - `RX_ENC_KEY`: (optional, auto-generated from APP_SECRET if omitted)
-   - `AZURE_OPENAI_ENDPOINT`: (optional for live OCR)
-   - `AZURE_OPENAI_KEY`: (optional)
-   - `AZURE_OPENAI_DEPLOYMENT`: (optional)
+   - `AZURE_OPENAI_ENDPOINT`: `https://rag-42.openai.azure.com` (optional for live Azure Vision)
+   - `AZURE_OPENAI_KEY`: `<your-azure-key>` (optional)
+   - `AZURE_OPENAI_DEPLOYMENT`: `gpt-5.6-luna` (optional, defaults to `gpt-5.6-luna`)
+
+> [!NOTE]
+> When Azure OpenAI credentials are configured, any uploaded prescription photo is processed live by Azure OpenAI Vision (`gpt-5.6-luna`) with automatic line extraction and doctor license validation. When unconfigured, the app seamlessly runs its built-in clinical OCR parser and pharmacist manual review fallback.
 5. Click **Create Web Service**.
 6. Render builds the Docker image and starts the server on `https://refillcare.onrender.com`.
 
