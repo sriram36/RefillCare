@@ -616,7 +616,7 @@ export default function PharmacistView({ user, lang, onToast, onOpenDashboard }:
                 </div>
                 <input
                   type="text"
-                  placeholder="e.g. Dr. P. Mukherjee, WBMC #49281"
+                  placeholder="e.g. Dr. Sample Doctor, WBMC-00000 (Sample data)"
                   value={h1Doctor}
                   onChange={(e) => setH1Doctor(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
@@ -625,10 +625,10 @@ export default function PharmacistView({ user, lang, onToast, onOpenDashboard }:
                   <span className="text-[11px] text-slate-400">Quick fill demo:</span>
                   <button
                     type="button"
-                    onClick={() => setH1Doctor("Dr. P. Mukherjee, WBMC #49281")}
+                    onClick={() => setH1Doctor("Dr. Sample Doctor, WBMC-00000")}
                     className="text-[11px] font-semibold text-purple-700 hover:underline"
                   >
-                    Dr. P. Mukherjee (WBMC #49281)
+                    Dr. Sample Doctor (WBMC-00000) [Sample data]
                   </button>
                 </div>
               </div>
