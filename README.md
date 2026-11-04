@@ -1,6 +1,6 @@
 # RefillCare
 
-A reliable, privacy-first online pharmacy reordering and verification platform designed for a 46-store pharmacy chain across Kolkata and Howrah.
+A reliable, privacy-first online pharmacy reordering and verification platform designed for the client's 46-store pharmacy chain across Kolkata and Howrah (this demo seeds the three stores named in the brief).
 
 - **Repository:** [https://github.com/sriram36/RefillCare](https://github.com/sriram36/RefillCare)
 - **Live App (Vercel):** [https://refillcare.vercel.app](https://refillcare.vercel.app)
@@ -22,7 +22,7 @@ RefillCare/
 │   │   └── storage.py        # Fernet (AES-128-CBC with HMAC-SHA256) encrypted blob / disk storage
 │   ├── database/             # Dual-engine persistence & schema
 │   │   ├── session.py        # Postgres / SQLite connection pool & query translation
-│   │   └── seed.py           # Auto-seeding 46 stores, patients, and test orders
+│   │   └── seed.py           # Auto-seeding stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), patients, and test orders
 │   ├── routers/              # Domain-bounded API route modules
 │   │   ├── auth.py           # Login, logout & DPDP consent
 │   │   ├── orders.py         # Order lifecycle, search, payments & webhook
@@ -31,7 +31,7 @@ RefillCare/
 │   │   ├── subscriptions.py  # Chronic auto-refill subscriptions engine
 │   │   ├── refills.py        # Refill calculations & reminders
 │   │   ├── profiles.py       # Family profiles & Right to Erasure ("Forget Me")
-│   │   └── dashboard.py      # 46-store metrics, SLA tracking & CSV sync
+│   │   └── dashboard.py      # Store network metrics, SLA tracking & CSV sync
 │   ├── services/             # Core business & integration services
 │   │   ├── ocr.py            # Multimodal prescription extraction & doctor check
 │   │   ├── catalog.py        # Medicine catalog & generic mappings
@@ -69,10 +69,10 @@ RefillCare is organized into two decoupled services:
    - **Stack:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons. Hosted on **Vercel**.
    - **Design:** Clean typography, calm healthcare aesthetics, high-contrast accessible states, role switcher, and trilingual support (English, বাংলা, हिन्दी).
    - **Portals:**
-     - **Customer App:** 1-tap monthly refills, active "Running Low" chips (&le;5 days supply), live search across 46 stores, prescription photo upload, 5-stage order tracking, and DPDP Act data rights.
+     - **Customer App:** 1-tap monthly refills, active "Running Low" chips (&le;5 days supply), live search across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), prescription photo upload, 5-stage order tracking, and DPDP Act data rights.
      - **Pharmacist Queue:** Side-by-side sticky prescription viewer and AI draft match lines, Schedule H1 regulatory register modal, rejection with mandatory reason, and generic savings offer.
      - **Store Staff Screen:** Store-scoped pick and pack workflow with hard regulatory gate preventing dispatch until pharmacist approval, invoice entry, and courier handover.
-     - **Central Operations Dashboard:** Real-time metrics across 46 stores, median verification SLA tracker (< 10 min benchmark), low-stock inventory alerts (&le; 5 units), daily stock CSV sync, and automated refill reminders trigger.
+     - **Central Operations Dashboard:** Real-time metrics across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), median verification SLA tracker (< 10 min benchmark), low-stock inventory alerts (&le; 5 units), daily stock CSV sync, and automated refill reminders trigger.
 
 2. **Backend API (`/backend`):**
    - **Stack:** FastAPI, Python 3.10+, SQLite (local) / PostgreSQL (production), Fernet (AES-128-CBC with HMAC-SHA256) encryption. Hosted on **Render Web Service**.
@@ -118,7 +118,7 @@ pip install -r requirements.txt
 # Start backend server
 python -m uvicorn app:app --port 8000 --reload
 ```
-The database and sample seed data (the 3 stores from the brief: Salt Lake, Behala, Howrah Maidan, sample patients, medicines, and encrypted demo prescriptions) are created automatically on first run.
+The database and sample seed data (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Salt Lake, Behala, Howrah Maidan, sample patients, medicines, and encrypted demo prescriptions) are created automatically on first run.
 
 #### 2. Start Frontend
 ```bash
@@ -153,7 +153,7 @@ All test accounts authenticate using OTP: **`123456`**.
 cd backend
 python -m pytest tests -q
 
-# 2. Automated End-to-End smoke test
+# 2. Automated smoke test (logs in as each role and checks the main screen loads)
 node e2e/smoke.js https://refillcare.vercel.app
 
 # 3. Frontend production build & typecheck

@@ -103,14 +103,14 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
         </div>
         <div className="flex items-center justify-center gap-2 pt-2 text-slate-400 text-xs">
           <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-          Loading 46-Store Central Operations Dashboard…
+          Loading Central Operations Dashboard…
         </div>
       </div>
     );
   }
 
   const overview = data?.network_overview || {
-    total_stores: 46,
+    total_stores: 3,
     active_orders: 0,
     total_orders: 0,
   };
@@ -142,7 +142,7 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Real-time fulfillment metrics across 46 stores in Kolkata & Howrah • Managing Director View
+            Real-time fulfillment metrics across all stores in Kolkata & Howrah • Managing Director View
           </p>
         </div>
 
@@ -181,7 +181,7 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
             <Store className="w-5 h-5 text-teal-700" />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-slate-900">{overview.total_stores || 46}</span>
+            <span className="text-3xl font-extrabold text-slate-900">{overview.total_stores || 3}</span>
             <span className="text-xs font-medium text-slate-500">Kolkata & Howrah</span>
           </div>
           <div className="mt-2 text-xs text-slate-500">
@@ -226,7 +226,7 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Store className="w-4 h-4 text-teal-700" />
-            46-Store Network Fulfillment & Inventory Summary
+            Network Fulfillment & Inventory Summary
           </h2>
           <span className="text-xs text-slate-400">Live Status</span>
         </div>
@@ -367,10 +367,10 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Upload className="w-4 h-4 text-teal-700" />
-            Upload Daily 46-Store Stock CSV
+            Upload Daily Stock CSV
           </h2>
           <p className="text-xs text-slate-500">
-            Sync daily inventory levels across all 46 stores and the central warehouse for accurate routing.
+            Sync daily inventory levels across all stores and the central warehouse for accurate routing.
           </p>
           <form onSubmit={handleStockUpload} className="space-y-3 pt-1">
             <input

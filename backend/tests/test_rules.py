@@ -520,7 +520,7 @@ def test_order_audit_trail_and_dashboard_summary():
     # Customer cannot access audit trail (DPDP role enforcement)
     assert c.get(f"/api/orders/{code}/audit", headers=cu).status_code == 403
 
-    # Pharmacist dashboard has 46-store / network summary & low stock alerts
+    # Pharmacist dashboard has store network summary & low stock alerts
     dash = c.get("/api/dashboard", headers=ph).json()
     assert "stores_summary" in dash
     assert len(dash["stores_summary"]) >= 3

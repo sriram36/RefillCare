@@ -13,7 +13,7 @@ Dedicated modern web application for RefillCare pharmacy reorder and verificatio
 1. **Customer Web App (`CustomerView.tsx`):**
    - 1-Tap monthly medicine reorder hero button
    - "Running Low" active alerts for chronic prescriptions (Metformin, Telmisartan, Levothyroxine)
-   - Real-time medicine search with live stock check across 46 stores
+   - Real-time medicine search with live stock check across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief)
    - Prescription upload with AI reading draft indicator
    - 5-stage live order tracking timeline
    - Generic substitution consent & savings prompt
@@ -31,11 +31,11 @@ Dedicated modern web application for RefillCare pharmacy reorder and verificatio
    - Packing with billing software invoice number recording
    - Handover to local courier/delivery executive
 4. **Central Operations & Executive Dashboard (`DashboardView.tsx`):**
-   - 46-Store network summary table (Kolkata & Howrah)
+   - Store network summary table (the client's chain has 46 stores; this demo seeds the three stores named in the brief)
    - Median verification SLA tracker (< 10 min benchmark)
    - Low-stock inventory alerts (<= 5 units)
    - Drugs & Cosmetics Act Schedule H1 Register compliance log
-   - Daily 46-store stock CSV file uploader
+   - Daily store stock CSV file uploader
    - Automated refill reminders engine trigger
 
 ## Quick Start (Local Development)

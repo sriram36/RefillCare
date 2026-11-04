@@ -129,7 +129,7 @@ async function main() {
         () => document.body.innerText.includes('Central Operations Dashboard') || document.body.innerText.includes('Managing Director View'),
         { timeout: 15000 }
       );
-      console.log('  ✓ Central Operations Dashboard rendered with 46-store metrics.');
+      console.log('  ✓ Central Operations Dashboard rendered.');
     }
     await phPage.close();
     passed++;

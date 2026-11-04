@@ -89,7 +89,7 @@ export default function Home() {
             <div className="text-center max-w-3xl mx-auto space-y-4">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold shadow-2xs">
                 <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-                RefillCare • 46 Stores Across Kolkata &amp; Howrah
+                RefillCare • Kolkata &amp; Howrah Pharmacy Network
               </div>
               <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
                 Monthly Medicine Refills in 60 Seconds

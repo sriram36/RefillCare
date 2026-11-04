@@ -4,9 +4,9 @@ High-performance Python backend built with **FastAPI** for the RefillCare pharma
 
 ## Features
 - **Regulatory Gate:** Enforces Drugs and Cosmetics Act Schedule H/H1 validation via pure business rules in `rules.py`. Blocks unapproved dispatches with HTTP 403.
-- **DPDP Act 2023 Compliance:** Prescriptions encrypted at rest with Fernet AES-128 (`rx_store/`), access logged in an audit trail, and minor profiles require verified guardian consent.
-- **46-Store Stock Routing:** Automatically selects the nearest pharmacy holding complete inventory for approved lines from daily stock records.
-- **Automated Startup Seeding:** Auto-detects missing database and seeds all 46 stores, chronic patient accounts, sample prescriptions, and medicines on boot.
+- **DPDP Act 2023 Compliance:** Prescriptions encrypted at rest with Fernet (AES-128-CBC with HMAC-SHA256) (`rx_store/`), access logged in an audit log (append-only table; not cryptographically tamper-proof), and minor profiles require verified guardian consent.
+- **Store Stock Routing:** Automatically selects the nearest pharmacy holding complete inventory for approved lines from daily stock records (the client's chain has 46 stores; this demo seeds the three stores named in the brief).
+- **Automated Startup Seeding:** Auto-detects missing database and seeds sample stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), chronic patient accounts, sample prescriptions, and medicines on boot.
 - **Trilingual Notifications:** Automated refill reminders sent based on remaining days of supply.
 
 ## Local Setup

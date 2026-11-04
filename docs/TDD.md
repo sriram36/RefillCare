@@ -10,7 +10,7 @@
 
 ## 1. Architecture and Rationale
 
-RefillCare is an end-to-end pharmacy reordering platform designed for Company A's 46-store retail chain in Kolkata and Howrah. The live database seeds and runs the 3 specific sample stores given in the brief (Store 1: Salt Lake, Store 2: Behala, Store 3: Howrah Maidan) along with the central warehouse. The architecture separates user experience and business rules into two decoupled services:
+RefillCare is an end-to-end pharmacy reordering platform designed for Company A: the client's chain has 46 stores; this demo seeds the three stores named in the brief (Store 1: Salt Lake, Store 2: Behala, Store 3: Howrah Maidan) along with the central warehouse. The architecture separates user experience and business rules into two decoupled services:
 
 1. **Frontend Client (`/frontend`):**
    - Standalone Next.js 14 application utilizing the App Router, React 18, TypeScript, and Tailwind CSS.
@@ -34,7 +34,7 @@ The schema manages the complete pharmacy reordering lifecycle:
 
 - `users`: `id`, `name`, `phone` (unique), `role` (`customer`, `pharmacist`, `store`), `store_id`, `consent_at`, `token_ver` (defaults to 1).
 - `meds`: `id`, `name`, `schedule` (`OTC`, `H`, `H1`, `X`, `NARC`), `price`, `generic_of`.
-- `stores`: `id`, `name`, `lat`, `lng` (seeds the 3 stores from the brief: Store 1: Salt Lake, Store 2: Behala, Store 3: Howrah Maidan).
+- `stores`: `id`, `name`, `lat`, `lng` (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Store 1: Salt Lake, Store 2: Behala, Store 3: Howrah Maidan).
 - `stock`: `store_id`, `med_id`, `qty` (primary key: `store_id`, `med_id`; refreshed from daily CSV).
 - `orders`: `code` (primary key), `customer_id`, `for_name`, `status`, `store_id`, `rx_file`, `note`, `created`, `verified_at`, `invoice_no`, `payment`, `paid`, `area`, `payment_ref`, `delivery_partner`.
 - `items`: `id`, `order_code`, `med_id`, `name`, `schedule`, `qty`, `price`, `conf`, `status` (`draft`, `approved`, `rejected`), `approved_by`, `reason`, `offer`, `consent`, `original_price`.
@@ -53,7 +53,7 @@ The schema manages the complete pharmacy reordering lifecycle:
 
 ### Roles
 - `customer`: 1-tap chronic reorders, prescription photo upload, family profile management, DPDP consent grant, data export, and Section 12 *Right to Erasure*.
-- `pharmacist`: reviews side-by-side prescription viewer and AI draft items, approves/edits/rejects lines with required statutory reason, validates prescriber license (WBMC/NMC), offers generic bioequivalent alternatives, inspects 46-store operational dashboard, and exports the Schedule H1 register.
+- `pharmacist`: reviews side-by-side prescription viewer and AI draft items, approves/edits/rejects lines with required statutory reason, validates prescriber license (WBMC/NMC), offers generic bioequivalent alternatives, inspects the central operational dashboard (the client's chain has 46 stores; this demo seeds the three stores named in the brief), and exports the Schedule H1 register.
 - `store`: scoped strictly to assigned store location, packs approved orders with physical store invoice entry, and executes courier handover. Store staff are physically prevented from accessing prescription image files.
 
 ### The Regulatory Safety Dispatch Gate
@@ -120,5 +120,5 @@ The following architectural decisions extend beyond the minimal brief to deliver
 ## 8. Verification & Testing
 
 - **Backend Automated Tests:** **34 passed tests** (`cd backend && python -m pytest tests -q`) covering routing, regulatory gates, cloud storage, subscriptions, transfers, and security headers.
-- **Automated E2E Smoke Test:** Automated Puppeteer suite (`node e2e/smoke.js`) verifying Customer, Pharmacist, Store Staff, and Central Dashboard on the live Vercel URL.
+- **Automated E2E Smoke Test:** A smoke test that logs in as each role and checks the main screen loads (`node e2e/smoke.js`).
 - **Frontend Production Build:** `next build` compiles all 3 static application routes (`/`, `/_not-found`, `/compliance` — 5 static pages total) with 0 errors.

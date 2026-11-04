@@ -42,7 +42,7 @@ export default function Header({ user, lang, onLangChange, onLogout }: HeaderPro
             </span>
             <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              46 Stores Live
+              Network Live
             </span>
           </div>
           <p className="hidden md:block text-[11px] text-slate-400 font-medium">

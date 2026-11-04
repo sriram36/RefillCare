@@ -19,7 +19,7 @@ An AI model reads uploaded prescriptions, but only as a draft. A human registere
 
 ## 2. Background and Problem
 
-Company A runs a 46-store pharmacy network across Kolkata and Howrah and a central warehouse, with 380 staff and revenue of ₹180–210 crore a year. The implementation seeds and runs the 3 stores from the brief (Salt Lake, Behala, Howrah Maidan). A large share of sales is repeat medicine for diabetes, blood pressure and thyroid.
+Company A runs a pharmacy network across Kolkata and Howrah (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Salt Lake, Behala, Howrah Maidan) and a central warehouse, with 380 staff and revenue of ₹180–210 crore a year. A large share of sales is repeat medicine for diabetes, blood pressure and thyroid.
 
 **Today:** customers call or WhatsApp a store with a photo of the prescription. Pharmacists check stock and reply, and staff deliver locally. Refills depend on the customer remembering. Prescriptions sit on store phones, and stores cannot see each other’s stock.
 
@@ -53,7 +53,7 @@ Company A runs a 46-store pharmacy network across Kolkata and Howrah and a centr
 | Customer or caregiver (mobile) | Reorder in a minute; calm, trustworthy app; often ordering for a parent | Customer role |
 | Store pharmacist | See the prescription beside the matched items; approve, edit or reject with a reason | Pharmacist role |
 | Store staff | Pick, pack, enter the store invoice number, hand over to delivery | Store staff role (scoped per store) |
-| Central operations | One view of orders across all 46 stores | Central Operations tab in Pharmacist view |
+| Central operations | One view of orders across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief) | Central Operations tab in Pharmacist view |
 
 ---
 
@@ -61,7 +61,7 @@ Company A runs a 46-store pharmacy network across Kolkata and Howrah and a centr
 
 **Core build required by the brief:** reorder flow with prescription upload, pharmacist verification queue, store routing, refill reminders. Roles: customer and pharmacist. AI: prescription reading as a draft. Hard part: blocking Schedule H items without approval.
 
-**Built and hardened:** store staff role, family profiles, search and over-the-counter cart, generic substitutes with consent, statutory H1 register, central dashboard, daily stock CSV upload, store invoice number, UPI payment (test mode simulation), cash on delivery, delivery-area routing, in-app refill messages, trilingual support (English, Bengali, Hindi), DPDP Act consent and Right to Erasure, token revocation, chronic auto-refill subscriptions, store stock transfers, and 46-store directory.
+**Built and hardened:** store staff role, family profiles, search and over-the-counter cart, generic substitutes with consent, statutory H1 register, central dashboard, daily stock CSV upload, store invoice number, UPI payment (test mode simulation), cash on delivery, delivery-area routing, in-app refill messages, trilingual support (English, Bengali, Hindi), DPDP Act consent and Right to Erasure, token revocation, chronic auto-refill subscriptions, and store stock transfers.
 
 ---
 

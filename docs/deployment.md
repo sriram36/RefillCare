@@ -1,6 +1,6 @@
 # RefillCare Deployment & Operations Guide
 
-RefillCare is an end-to-end pharmacy reorder and verification system built for a 46-store chain across Kolkata and Howrah.
+RefillCare is an end-to-end pharmacy reorder and verification system built for a chain across Kolkata and Howrah (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Salt Lake, Behala, Howrah Maidan).
 It features a dedicated **Next.js 14 App Router frontend** and a high-performance **FastAPI backend** with DPDP Act encryption, Drugs & Cosmetics Act Schedule H/H1 regulatory gates, and automated stock routing.
 
 - **Live Web Application:** [https://refillcare.vercel.app](https://refillcare.vercel.app)
@@ -22,9 +22,9 @@ Reviewers can verify the core regulatory gates and workflows in under 3 minutes 
    - Sign out and click 1-tap login for **Anita Rao (Pharmacist)** (`9000000099`).
    - In the verification queue, review `RX-50214` side-by-side with the prescription viewer, inspect the doctor's WBMC registration check badge, and click **Approve Line**.
    - Notice how generic bioequivalent substitution (Janaushadhi) can be offered with 1 click.
-3. **Inspect the 46-Store Executive Dashboard**
+3. **Inspect the Executive Dashboard**
    - Click the **Central Operations** tab in the top header.
-   - View real-time fulfillment KPIs across all 46 Kolkata & Howrah locations, verification SLA (< 10 min vs target), stock levels, and drop-off prevention metrics.
+   - View real-time fulfillment KPIs across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), verification SLA (< 10 min vs target), stock levels, and drop-off prevention metrics.
 
 ---
 
@@ -36,7 +36,7 @@ Reviewers can verify the core regulatory gates and workflows in under 3 minutes 
 |  - Customer Portal: 1-Tap Refills, Prescription OCR draft  |
 |  - Pharmacist Verification: Side-by-Side Review, H1 Reg     |
 |  - Store Fulfillment: Hard Regulatory Gate, Pack & Dispatch |
-|  - Central Dashboard: 46-Store SLA Tracker, Stock CSV       |
+|  - Central Dashboard: Store SLA Tracker, Stock CSV         |
 |  Hosted on: Vercel (https://refillcare.vercel.app)          |
 +-------------------------------------------------------------+
                                |
@@ -46,7 +46,7 @@ Reviewers can verify the core regulatory gates and workflows in under 3 minutes 
 +-------------------------------------------------------------+
 |                Backend API (FastAPI + Python 3.10+)         |
 |  - Fernet (AES-128-CBC with HMAC-SHA256) for Prescriptions   |
-|  - Automated 46-Store Stock Routing Engine                  |
+|  - Automated Store Stock Routing Engine                    |
 |  - DPDP Act 2023 Access Logs & Minor Consent Protection     |
 |  - Automated Startup Database Seeding                       |
 |  Hosted on: Render Web Service (Docker)                     |
@@ -63,11 +63,11 @@ The Docker container automatically seeds the database on startup:
 2. When the Docker container starts, `app.py` runs `init()`.
 3. Seeing that no database exists on the first boot, `init()`:
    - Creates all tables (`SCHEMA`).
-   - Seeds all **46 stores** across Kolkata & Howrah.
+   - Seeds sample stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Salt Lake, Behala, Howrah Maidan).
    - Seeds regular patients: **Debasish Ghosh** (diabetes / Metformin), **Rina Sen** (blood pressure / Telmisartan), and **Arif Mondal** (thyroid / Levothyroxine).
    - Seeds store staff and registered pharmacist Anita Rao.
    - Seeds all medicines (Schedule H, Schedule H1, Generics, OTC, and restricted Schedule X/Narcotics blocklist).
-   - Seeds store inventory across all stores.
+   - Seeds store inventory across the seeded stores.
    - Calls `seed_images()` to generate and encrypt initial synthetic sample prescriptions (`RX-50211`, `RX-50214`, `RX-50219`).
 
 ### Running via Docker Locally

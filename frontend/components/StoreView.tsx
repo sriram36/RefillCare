@@ -178,7 +178,7 @@ export default function StoreView({ user, lang, onToast }: StoreViewProps) {
                 Inter-Store & Central Warehouse Requisitions
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Transfer inventory between 46 neighborhood locations and Central Warehouse to prevent customer drop-off.
+                Transfer inventory between neighborhood locations and Central Warehouse to prevent customer drop-off.
               </p>
             </div>
             <button

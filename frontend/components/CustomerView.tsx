@@ -365,7 +365,7 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
         <div className="relative z-10 max-w-2xl space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur-md">
             <Sparkles className="w-3.5 h-3.5 text-teal-200" />
-            46 Neighborhood Stores • Under 60-Minute Local Dispatch
+            Neighborhood Stores • Under 60-Minute Local Dispatch
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Need Your Monthly Medicine Refill?
@@ -690,7 +690,7 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
             <span>{t('search_title')}</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Check stock across 46 stores and view generic bioequivalent alternatives
+            Check stock across all stores and view generic bioequivalent alternatives
           </p>
         </div>
 
