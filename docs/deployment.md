@@ -3,6 +3,29 @@
 RefillCare is an end-to-end pharmacy reorder and verification system built for a 46-store chain across Kolkata and Howrah.
 It features a dedicated **Next.js 14 App Router frontend** and a high-performance **FastAPI backend** with DPDP Act encryption, Drugs & Cosmetics Act Schedule H/H1 regulatory gates, and automated stock routing.
 
+- **Live Web Application:** [https://refillcare.vercel.app](https://refillcare.vercel.app)
+- **Backend API & Swagger Docs:** [https://refillcare.onrender.com/docs](https://refillcare.onrender.com/docs)
+- **GitHub Repository:** [https://github.com/sriram36/RefillCare](https://github.com/sriram36/RefillCare)
+
+---
+
+## Try This in 3 Minutes
+
+Reviewers can verify the core regulatory gates and workflows in under 3 minutes on the live deployment:
+- **Demo OTP:** `123456` across all pre-seeded demo accounts.
+
+1. **Verify the Schedule H Regulatory Gate (403 Block)**
+   - Click the 1-tap login for **Behala Store Staff** (`9000000082`).
+   - Notice order `RX-50214` (Telmisartan 40 mg, Schedule H) has a disabled button: *"Awaiting Pharmacist Check"*.
+   - Attempting to pack or dispatch without registered pharmacist approval is strictly blocked by the backend with HTTP `403 APPROVAL_REQUIRED`.
+2. **Review Prescription & Doctor License as Pharmacist**
+   - Sign out and click 1-tap login for **Anita Rao (Pharmacist)** (`9000000099`).
+   - In the verification queue, review `RX-50214` side-by-side with the prescription viewer, inspect the doctor's WBMC registration check badge, and click **Approve Line**.
+   - Notice how generic bioequivalent substitution (Janaushadhi) can be offered with 1 click.
+3. **Inspect the 46-Store Executive Dashboard**
+   - Click the **Central Operations** tab in the top header.
+   - View real-time fulfillment KPIs across all 46 Kolkata & Howrah locations, verification SLA (< 10 min vs target), stock levels, and drop-off prevention metrics.
+
 ---
 
 ## 1. System Architecture
@@ -14,15 +37,15 @@ It features a dedicated **Next.js 14 App Router frontend** and a high-performanc
 |  - Pharmacist Verification: Side-by-Side Review, H1 Reg     |
 |  - Store Fulfillment: Hard Regulatory Gate, Pack & Dispatch |
 |  - Central Dashboard: 46-Store SLA Tracker, Stock CSV       |
-|  Hosted on: Vercel or Render Static Site                    |
+|  Hosted on: Vercel (https://refillcare.vercel.app)          |
 +-------------------------------------------------------------+
                                |
                         HTTP / JSON API
                      (CORS Authenticated)
                                v
 +-------------------------------------------------------------+
-|                Backend API (FastAPI + Python 3.12)          |
-|  - Fernet AES-128 Encryption for Prescriptions              |
+|                Backend API (FastAPI + Python 3.10+)         |
+|  - Fernet AES-256 Encryption for Prescriptions              |
 |  - Automated 46-Store Stock Routing Engine                  |
 |  - DPDP Act 2023 Access Logs & Minor Consent Protection     |
 |  - Automated Startup Database Seeding                       |
@@ -74,7 +97,7 @@ Open `http://localhost:8000/docs` to explore the OpenAPI documentation.
    - **Plan:** Free ($0/month) or Starter ($7/month)
 4. **Environment Variables:**
    - `APP_SECRET`: `<generate a long random value; never commit it>`
-   - `RX_ENC_KEY`: (optional, auto-generated if omitted)
+   - `RX_ENC_KEY`: (optional, auto-generated from APP_SECRET if omitted)
    - `AZURE_OPENAI_ENDPOINT`: (optional for live OCR)
    - `AZURE_OPENAI_KEY`: (optional)
    - `AZURE_OPENAI_DEPLOYMENT`: (optional)
@@ -85,28 +108,19 @@ Open `http://localhost:8000/docs` to explore the OpenAPI documentation.
 
 ## 4. Deploying the Next.js Frontend
 
-The modern frontend is located in `/frontend`. It can be deployed to **Vercel** or **Render Static Site**.
+The modern frontend is located in `/frontend`. It is deployed on **Vercel**.
 
-### Deploying on Vercel (Recommended for Next.js)
+### Deploying on Vercel
 1. Go to [Vercel Dashboard](https://vercel.com/new).
 2. Import repository `sriram36/RefillCare`.
 3. Configure Project Settings:
    - **Framework Preset:** Next.js
-   - **Root Directory:** Select `frontend` (or click Edit and select `frontend`).
+   - **Root Directory:** `frontend`
 4. **Environment Variables:**
    - Name: `NEXT_PUBLIC_API_URL`
    - Value: `https://refillcare.onrender.com`
 5. Click **Deploy**.
-   Vercel will compile the Next.js App Router project and assign a custom URL (e.g. `https://refillcare-frontend.vercel.app`).
-
-### Deploying on Render (Static Site)
-1. On Render Dashboard -> **New** -> **Static Site**.
-2. Select repository `sriram36/RefillCare`.
-3. Set:
-   - **Root Directory:** `frontend`
-   - **Build Command:** `npm run build`
-   - **Publish Directory:** `out` (or configure Web Service with `npm run start`)
-   - **Environment Variable:** `NEXT_PUBLIC_API_URL=https://refillcare.onrender.com`
+   Vercel compiles the Next.js App Router project and assigns the production URL: `https://refillcare.vercel.app`.
 
 ---
 
@@ -152,9 +166,20 @@ All accounts use the demo OTP: `123456`
 
 ## 7. Verification & Testing
 
-### Backend Unit & Integration Tests (20/20)
+### Backend Unit & Integration Tests (34/34 passing)
 ```bash
-python -m pytest backend/tests -q
+cd backend
+python -m pytest tests -q
+```
+
+### Automated End-to-End Smoke Test
+Run against the live Vercel deployment:
+```bash
+node e2e/smoke.js https://refillcare.vercel.app
+```
+Or against local dev:
+```bash
+node e2e/smoke.js http://localhost:3000
 ```
 
 ### Frontend Production Build
