@@ -35,3 +35,20 @@ def test_dpdp_right_to_erasure():
     # User token is now revoked
     res_after = c.get("/api/orders", headers=cu2)
     assert res_after.status_code == 401
+
+
+def test_render_without_app_secret_raises_error(monkeypatch):
+    import importlib
+    import pytest
+    import core.config
+
+    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setenv("APP_SECRET", "")
+    try:
+        with pytest.raises(RuntimeError, match="APP_SECRET"):
+            importlib.reload(core.config)
+    finally:
+        monkeypatch.delenv("RENDER", raising=False)
+        monkeypatch.delenv("APP_SECRET", raising=False)
+        importlib.reload(core.config)
+

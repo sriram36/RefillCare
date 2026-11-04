@@ -54,3 +54,15 @@ def test_razorpay_payment_flow():
     )
     assert hook_res.status_code == 200
     assert hook_res.json()["status"] == "ok"
+
+
+def test_razorpay_secret_fallback_random():
+    from core import config
+    assert isinstance(config.RAZORPAY_KEY_SECRET, str)
+    assert len(config.RAZORPAY_KEY_SECRET) >= 32
+    assert config.RAZORPAY_KEY_SECRET != "refillcare_secret_demo"
+
+    sig = payments.generate_test_signature("order_test_abc", "pay_test_xyz")
+    assert payments.verify_payment_signature("order_test_abc", "pay_test_xyz", sig) is True
+    assert payments.verify_payment_signature("order_test_abc", "pay_test_xyz", "invalid_sig") is False
+

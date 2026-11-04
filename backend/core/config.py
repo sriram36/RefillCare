@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import os
+import secrets
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -15,6 +16,10 @@ if os.path.exists(_env_path):
                 _k, _v = _k.strip(), _v.strip().strip("'\"")
                 if _k and _k not in os.environ:
                     os.environ[_k] = _v
+
+# If running in Render production, APP_SECRET must be explicitly provided
+if os.getenv("RENDER") and not os.getenv("APP_SECRET"):
+    raise RuntimeError("APP_SECRET environment variable must be set when running on Render.")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 DB = os.getenv("DB_PATH", os.path.join(BASE_DIR, "pharmacy.db"))
@@ -32,7 +37,7 @@ AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
 
 # Payment Gateway Configuration (Razorpay)
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "rzp_test_refillcare_demo")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "refillcare_secret_demo")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET") or secrets.token_hex(32)
 
 AREAS = {
     "Park Street": (22.5535, 88.3520),

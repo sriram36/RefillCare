@@ -73,7 +73,7 @@ Open `http://localhost:8000/docs` to explore the OpenAPI documentation.
    - **Environment / Language:** `Docker`
    - **Plan:** Free ($0/month) or Starter ($7/month)
 4. **Environment Variables:**
-   - `APP_SECRET`: e.g. `rfcare-kolkata-prod-2026-secret`
+   - `APP_SECRET`: `<generate a long random value; never commit it>`
    - `RX_ENC_KEY`: (optional, auto-generated if omitted)
    - `AZURE_OPENAI_ENDPOINT`: (optional for live OCR)
    - `AZURE_OPENAI_KEY`: (optional)
