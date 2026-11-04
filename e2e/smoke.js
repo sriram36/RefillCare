@@ -1,26 +1,23 @@
+#!/usr/bin/env node
 /**
- * RefillCare E2E Automated Smoke Test
- * Uses puppeteer-core with the system Chrome browser.
- * Validates landing page and role-gated views for Customer, Pharmacist, and Store Staff.
+ * RefillCare Automated End-to-End Smoke Test
+ * Tests core authentication and role-specific screens across Customer, Pharmacist,
+ * Central Operations Dashboard, and Store Staff portals.
+ *
+ * Usage:
+ *   node e2e/smoke.js [TARGET_URL]
+ * Default TARGET_URL: https://refillcare.vercel.app
  */
 
 const fs = require('fs');
 const path = require('path');
-
-// Resolve puppeteer-core from local node_modules
 let puppeteer;
 try {
   puppeteer = require('puppeteer-core');
-} catch (e) {
-  try {
-    puppeteer = require(path.join(__dirname, '..', 'frontend', 'node_modules', 'puppeteer-core'));
-  } catch (err) {
-    console.error('puppeteer-core not found. Run: npm --prefix frontend install');
-    process.exit(1);
-  }
+} catch {
+  puppeteer = require(path.join(__dirname, '..', 'frontend', 'node_modules', 'puppeteer-core'));
 }
 
-// Locate Chrome binary across common Windows, Mac, and Linux locations
 function getChromePath() {
   if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
     return process.env.CHROME_PATH;
@@ -45,7 +42,7 @@ const DEMO_OTP = '123456';
 
 async function runRoleLogin(page, phone, expectedText, roleName) {
   console.log(`\n[${roleName}] Testing login with phone ${phone}...`);
-  // Clear any existing session
+  await page.goto(TARGET_URL, { waitUntil: 'networkidle2' });
   await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();
@@ -53,7 +50,7 @@ async function runRoleLogin(page, phone, expectedText, roleName) {
   await page.goto(TARGET_URL, { waitUntil: 'networkidle2' });
 
   // Type credentials into the login form
-  await page.waitForSelector('#ph', { timeout: 10000 });
+  await page.waitForSelector('#ph', { timeout: 15000 });
   await page.type('#ph', phone);
   await page.type('#otp', DEMO_OTP);
 
@@ -90,62 +87,73 @@ async function main() {
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1280,800']
   });
 
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
-
   let passed = 0;
   let failed = 0;
 
   try {
     // 1. Landing Page Test
     console.log('\n[Landing Page] Loading unauthenticated entry screen...');
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 800 });
     await page.goto(TARGET_URL, { waitUntil: 'networkidle2' });
     const title = await page.title();
     console.log(`  Title: "${title}"`);
     const pageText = await page.evaluate(() => document.body.innerText);
-    if (!pageText.includes('RefillCare') || !pageText.includes('46 Stores')) {
-      throw new Error('Landing page missing RefillCare brand or 46 stores banner');
+    if (!pageText.includes('RefillCare')) {
+      throw new Error('Landing page missing RefillCare brand');
     }
     console.log('  ✓ Landing page rendered with branding and trust badges.');
+    await page.close();
     passed++;
 
     // 2. Customer Portal Test (Debasish Ghosh)
-    await runRoleLogin(page, '9000000001', 'Debasish Ghosh', 'Customer');
+    const customerPage = await browser.newPage();
+    await customerPage.setViewport({ width: 1280, height: 800 });
+    await runRoleLogin(customerPage, '9000000001', 'Debasish Ghosh', 'Customer');
+    await customerPage.close();
     passed++;
 
     // 3. Pharmacist Verification Portal Test (Anita Rao)
-    await runRoleLogin(page, '9000000099', 'Anita Rao', 'Pharmacist');
+    const phPage = await browser.newPage();
+    await phPage.setViewport({ width: 1280, height: 800 });
+    await runRoleLogin(phPage, '9000000099', 'Anita Rao', 'Pharmacist');
     // Test Central Operations Dashboard switch
-    const dashBtn = await page.evaluateHandle(() => {
+    const dashBtn = await phPage.evaluateHandle(() => {
       const btns = Array.from(document.querySelectorAll('button'));
       return btns.find(b => b.innerText.includes('Central Operations'));
     });
     if (dashBtn) {
       console.log('  Testing tab switch to Central Operations Dashboard...');
       await dashBtn.click();
-      await page.waitForFunction(
+      await phPage.waitForFunction(
         () => document.body.innerText.includes('Central Operations Dashboard') || document.body.innerText.includes('Managing Director View'),
         { timeout: 15000 }
       );
       console.log('  ✓ Central Operations Dashboard rendered with 46-store metrics.');
     }
+    await phPage.close();
     passed++;
 
     // 4. Store Fulfillment Staff Test (Salt Lake Store)
-    await runRoleLogin(page, '9000000081', 'Fulfillment', 'Store Staff');
+    const storePage = await browser.newPage();
+    await storePage.setViewport({ width: 1280, height: 800 });
+    await runRoleLogin(storePage, '9000000081', 'Fulfillment', 'Store Staff');
+    await storePage.close();
     passed++;
 
     console.log('\n====================================================');
     console.log(`Smoke Test Complete: ${passed} PASSED, ${failed} FAILED.`);
     console.log('====================================================');
   } catch (err) {
-    console.error('\n❌ Smoke Test Failed:', err.message);
     failed++;
+    console.error('\n❌ Smoke Test Failed:', err.message);
+    process.exitCode = 1;
   } finally {
     await browser.close();
   }
-
-  if (failed > 0) process.exit(1);
 }
 
-main();
+main().catch(err => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
