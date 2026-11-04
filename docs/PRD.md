@@ -169,7 +169,7 @@ Company A runs 46 stores across Kolkata and Howrah and a central warehouse, with
 
 | Area | Requirement | Status |
 | --- | --- | --- |
-| Privacy (DPDP Act 2023) | Prescriptions encrypted at rest with AES-256 Fernet; every view logged | Built |
+| Privacy (DPDP Act 2023) | Prescriptions encrypted at rest with Fernet (AES-128-CBC with HMAC-SHA256); every view logged | Built |
 | Access control | Role checks on every endpoint; store staff scoped to one store | Built |
 | Sessions | Signed tokens with server-side revocation on logout (`token_ver`) | Built |
 | Consent & Erasure | DPDP consent capture upon login; Section 12 Right to Erasure (`/api/me/forget`) | Built |

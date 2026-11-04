@@ -45,7 +45,7 @@ Reviewers can verify the core regulatory gates and workflows in under 3 minutes 
                                v
 +-------------------------------------------------------------+
 |                Backend API (FastAPI + Python 3.10+)         |
-|  - Fernet AES-256 Encryption for Prescriptions              |
+|  - Fernet (AES-128-CBC with HMAC-SHA256) for Prescriptions   |
 |  - Automated 46-Store Stock Routing Engine                  |
 |  - DPDP Act 2023 Access Logs & Minor Consent Protection     |
 |  - Automated Startup Database Seeding                       |

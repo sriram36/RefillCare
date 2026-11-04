@@ -19,7 +19,7 @@ RefillCare/
 │   ├── core/                 # Configuration, security, encryption & storage
 │   │   ├── config.py         # Environment configuration & Render guards
 │   │   ├── security.py       # Authentication, RBAC, tokens & rate limits
-│   │   └── storage.py        # AES-256 encrypted blob / disk storage
+│   │   └── storage.py        # Fernet (AES-128-CBC with HMAC-SHA256) encrypted blob / disk storage
 │   ├── database/             # Dual-engine persistence & schema
 │   │   ├── session.py        # Postgres / SQLite connection pool & query translation
 │   │   └── seed.py           # Auto-seeding 46 stores, patients, and test orders
@@ -75,10 +75,10 @@ RefillCare is organized into two decoupled services:
      - **Central Operations Dashboard:** Real-time metrics across 46 stores, median verification SLA tracker (< 10 min benchmark), low-stock inventory alerts (&le; 5 units), daily stock CSV sync, and automated refill reminders trigger.
 
 2. **Backend API (`/backend`):**
-   - **Stack:** FastAPI, Python 3.10+, SQLite (local) / PostgreSQL (production), Fernet AES-256 encryption. Hosted on **Render Web Service**.
+   - **Stack:** FastAPI, Python 3.10+, SQLite (local) / PostgreSQL (production), Fernet (AES-128-CBC with HMAC-SHA256) encryption. Hosted on **Render Web Service**.
    - **Compliance:**
      - Drugs and Cosmetics Act & Rules: Schedule H and H1 medicines require registered pharmacist approval; Schedule X and narcotic items are strictly prohibited online; Schedule H1 sales are logged to a statutory register.
-     - DPDP Act 2023: Prescriptions are encrypted at rest with Fernet AES-256, access is logged in a tamper-evident audit trail, and minor profiles require explicit guardian consent.
+     - DPDP Act 2023: Prescriptions are encrypted at rest with Fernet (AES-128-CBC with HMAC-SHA256), access is logged in a tamper-evident audit trail, and minor profiles require explicit guardian consent.
    - **Routing Engine:** Automatically calculates distance from customer delivery area to stores holding complete inventory from daily stock records.
    - **CORS Support:** Full cross-origin resource sharing configured to allow standalone Next.js deployments on Vercel.
 

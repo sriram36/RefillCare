@@ -23,7 +23,7 @@ RefillCare separates the user experience and business rules into two decoupled s
    - High-performance Python FastAPI service deployed via Docker on **Render** (`https://refillcare.onrender.com`).
    - Pure regulatory and safety business rules live strictly in [`rules.py`](file:///d:/pharmacy-reorder/backend/rules.py) with zero database dependencies, ensuring 100% deterministic test coverage.
    - **Dual-Persistence Engine:** The universal database layer in [`database/session.py`](file:///d:/pharmacy-reorder/backend/database/session.py) auto-detects `DATABASE_URL` in production to run PostgreSQL with connection pooling (`psycopg2`), while defaulting to SQLite in WAL mode with a 20-second busy timeout for local development. Parameterized queries (`?` translated to `%s` for Postgres) prevent SQL injection.
-   - **Encrypted Blob Storage:** Uploaded prescriptions are encrypted with AES-256 Fernet keys in [`core/storage.py`](file:///d:/pharmacy-reorder/backend/core/storage.py) before writing to cloud blob storage (Azure Blob / S3) with local encrypted disk fallback.
+   - **Encrypted Blob Storage:** Uploaded prescriptions are encrypted with Fernet (AES-128-CBC with HMAC-SHA256) keys in [`core/storage.py`](file:///d:/pharmacy-reorder/backend/core/storage.py) before writing to cloud blob storage (Azure Blob / S3) with local encrypted disk fallback.
    - OWASP security headers (`nosniff`, `DENY`, `strict-origin-when-cross-origin`) are injected on all responses.
 
 ---
