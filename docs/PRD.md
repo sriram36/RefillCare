@@ -204,7 +204,7 @@ Company A runs 46 stores across Kolkata and Howrah and a central warehouse, with
 - **A3:** Razorpay/UPI integration is a **TEST-MODE SIMULATION** (no real money moves).
 - **A4:** Doctor registration structural checks run on synthetic demo prescriptions only.
 - **A5:** Inter-store stock transfers from the central warehouse are implemented to solve stockouts.
-- **A6:** A public 46-store directory (`/stores`) and statutory compliance center (`/compliance`) are provided.
+- **A6:** A statutory compliance center (`/compliance`) is provided.
 - **A7:** Chronic auto-refill subscriptions engine (`/api/subscriptions`) runs on 30/60/90 day intervals.
 - **A8:** Prescriptions are assumed valid for 180 days (`RX_VALID_DAYS = 180` in `rules.py`) for chronic refills.
 - **A9:** OTP authentication uses fixed demo code `123456`.

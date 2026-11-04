@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Pill, LogOut, Globe, Shield, Sparkles, Building2 } from 'lucide-react';
+import { Pill, LogOut, Globe, Shield, Sparkles } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 
 interface HeaderProps {
@@ -58,13 +58,6 @@ export default function Header({ user, lang, onLangChange, onLogout }: HeaderPro
           className="px-3.5 py-1.5 rounded-xl hover:text-teal-900 hover:bg-white/80 transition"
         >
           Reorder Home
-        </Link>
-        <Link
-          href="/stores"
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl hover:text-teal-900 hover:bg-white/80 transition"
-        >
-          <Building2 className="w-3.5 h-3.5 text-teal-700" />
-          <span>46 Stores Directory</span>
         </Link>
         <Link
           href="/compliance"

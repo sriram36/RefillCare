@@ -220,7 +220,6 @@ export default function CompliancePage() {
           </div>
           <div className="flex items-center gap-4">
             <Link href="/" className="hover:text-teal-800 font-semibold">Online Reordering</Link>
-            <Link href="/stores" className="hover:text-teal-800 font-semibold">46 Pharmacy Locations</Link>
           </div>
         </div>
       </footer>

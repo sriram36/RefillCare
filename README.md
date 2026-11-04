@@ -42,7 +42,7 @@ RefillCare/
 │   ├── requirements.txt      # Python dependencies
 │   └── Dockerfile            # Container configuration for Render
 ├── frontend/                 # Dedicated Next.js 14 App Router client
-│   ├── app/                  # App Router pages (Home, /stores, /compliance)
+│   ├── app/                  # App Router pages (Home, /compliance)
 │   ├── components/           # Role-specific views & modals
 │   ├── lib/                  # Type-safe API client & trilingual i18n
 │   ├── package.json          # Node dependencies

@@ -211,17 +211,13 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-700">RefillCare Healthcare</span>
             <span>•</span>
-            <Link href="/stores" className="text-teal-800 hover:underline font-semibold">
-              46 Pharmacy Locations in Kolkata &amp; Howrah
-            </Link>
+            <span className="text-slate-600 font-semibold">
+              Kolkata &amp; Howrah Pharmacy Network
+            </span>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/compliance" className="text-slate-600 hover:text-teal-800 font-semibold hover:underline">
               DPDP Act (2023) &amp; Rule 65 Compliance
-            </Link>
-            <span>•</span>
-            <Link href="/stores" className="text-slate-600 hover:text-teal-800 font-semibold hover:underline">
-              Store Locator
             </Link>
           </div>
         </div>

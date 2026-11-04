@@ -98,11 +98,10 @@ The following architectural decisions extend beyond the minimal brief to deliver
 - **A1 (Payment Simulation):** Razorpay / UPI intent integration is a **TEST-MODE SIMULATION**. No real currency moves. Order IDs and HMAC signatures are generated and verified cryptographically, but rely on simulated capture webhooks.
 - **A2 (Doctor Registration Validation):** Prescriber license checks (WBMC, NMC, MCI) are structurally verified against standard medical council formatting rules on synthetic demo prescriptions. No live database connection to the Medical Council registry exists.
 - **A3 (Stock Transfers Hub):** Inter-store stock transfer requisitions between local branches and the central warehouse are implemented to solve the client's stockout drop-off problem.
-- **A4 (Public Store Directory):** A dedicated 46-store searchable locator (`/stores`) is provided to display store operating hours, phone numbers, and on-duty pharmacists.
-- **A5 (Statutory Compliance Center):** A formal transparency disclosure page (`/compliance`) documents patient rights under the DPDP Act 2023 and Rule 65.
-- **A6 (Chronic Auto-Refill Subscriptions):** An automated subscription engine (`/api/subscriptions`) allows recurring refills on 30/60/90 day intervals to prevent the 20% customer churn.
-- **A7 (Prescription Validity Period):** In the absence of a stated validity window in the brief, prescriptions are assumed valid for 180 days (`RX_VALID_DAYS = 180` in `rules.py`) for chronic repeat refills.
-- **A8 (Mocked Outside Systems):** The following integrations are mocked:
+- **A4 (Statutory Compliance Center):** A formal transparency disclosure page (`/compliance`) documents patient rights under the DPDP Act 2023 and Rule 65.
+- **A5 (Chronic Auto-Refill Subscriptions):** An automated subscription engine (`/api/subscriptions`) allows recurring refills on 30/60/90 day intervals to prevent the 20% customer churn.
+- **A6 (Prescription Validity Period):** In the absence of a stated validity window in the brief, prescriptions are assumed valid for 180 days (`RX_VALID_DAYS = 180` in `rules.py`) for chronic repeat refills.
+- **A7 (Mocked Outside Systems):** The following integrations are mocked:
   - Phone OTP: Fixed demo OTP `123456`.
   - SMS / WhatsApp Notifications: Dispatch logged to server console via `services.notifications.notify`.
   - Delivery Partner: Delivery carrier assignment is selected and recorded upon store dispatch.
@@ -122,4 +121,4 @@ The following architectural decisions extend beyond the minimal brief to deliver
 
 - **Backend Automated Tests:** **34 passed tests** (`cd backend && python -m pytest tests -q`) covering routing, regulatory gates, cloud storage, subscriptions, transfers, and security headers.
 - **Automated E2E Smoke Test:** Automated Puppeteer suite (`node e2e/smoke.js`) verifying Customer, Pharmacist, Store Staff, and Central Dashboard on the live Vercel URL.
-- **Frontend Production Build:** `next build` compiles all 6 static routes (`/`, `/_not-found`, `/compliance`, `/stores`) with 0 errors.
+- **Frontend Production Build:** `next build` compiles all 3 static application routes (`/`, `/_not-found`, `/compliance` — 5 static pages total) with 0 errors.
