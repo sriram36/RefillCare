@@ -45,7 +45,7 @@ The schema manages the complete pharmacy reordering lifecycle:
 - `payment_orders`: `id`, `order_code`, `razorpay_order_id`, `amount`, `currency`, `status`, `created_at` (payment intent tracking).
 - `profiles`: `id`, `customer_id`, `name`, `relation`, `is_minor`, `guardian_consent`.
 - `register`: `order_code`, `item_id`, `prescriber`, `patient`, `qty`, `ts` (statutory Rule 65 Schedule H1 register).
-- `audit`: `ts`, `actor`, `action`, `entity` (tamper-evident audit log for DPDP Act compliance).
+- `audit`: `ts`, `actor`, `action`, `entity` (audit log (append-only table; not cryptographically tamper-proof) for DPDP Act compliance).
 
 ---
 
@@ -79,7 +79,7 @@ The gate is implemented in `rules.can_dispatch(items)` and evaluated on every pa
 A multimodal vision model inspects uploaded prescription photos and extracts draft lines:
 - **Draft Only:** AI output is strictly an editable suggestion in the pharmacist's verification workbench. It never dispenses or updates inventory autonomously.
 - **Fail-safe:** If handwriting is illegible or confidence is low, the order is placed on hold with a customer re-upload notification. If the AI service is unreachable, the pharmacist reads the image manually.
-- **Doctor Registration Check:** The system structurally validates doctor registration numbers (WBMC, NMC, MCI) before Schedule H1 dispensing.
+- **Doctor Registration Check:** Doctor registration number: format check only, shown to the pharmacist as information; it does not block dispensing.
 
 ---
 
@@ -97,7 +97,7 @@ The following architectural decisions extend beyond the minimal brief to deliver
 
 - **A1 (Payment Simulation):** Razorpay / UPI intent integration is a **TEST-MODE SIMULATION**. No real currency moves. Order IDs and HMAC signatures are generated and verified cryptographically, but rely on simulated capture webhooks.
 - **A2 (Doctor Registration Validation):** Prescriber license checks (WBMC, NMC, MCI) are structurally verified against standard medical council formatting rules on synthetic demo prescriptions. No live database connection to the Medical Council registry exists.
-- **A3 (Stock Transfers Hub):** Inter-store stock transfer requisitions between local branches and the Taratala Central Warehouse are implemented to solve the client's stockout drop-off problem.
+- **A3 (Stock Transfers Hub):** Inter-store stock transfer requisitions between local branches and the central warehouse are implemented to solve the client's stockout drop-off problem.
 - **A4 (Public Store Directory):** A dedicated 46-store searchable locator (`/stores`) is provided to display store operating hours, phone numbers, and on-duty pharmacists.
 - **A5 (Statutory Compliance Center):** A formal transparency disclosure page (`/compliance`) documents patient rights under the DPDP Act 2023 and Rule 65.
 - **A6 (Chronic Auto-Refill Subscriptions):** An automated subscription engine (`/api/subscriptions`) allows recurring refills on 30/60/90 day intervals to prevent the 20% customer churn.

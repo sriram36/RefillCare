@@ -78,7 +78,7 @@ RefillCare is organized into two decoupled services:
    - **Stack:** FastAPI, Python 3.10+, SQLite (local) / PostgreSQL (production), Fernet (AES-128-CBC with HMAC-SHA256) encryption. Hosted on **Render Web Service**.
    - **Compliance:**
      - Drugs and Cosmetics Act & Rules: Schedule H and H1 medicines require registered pharmacist approval; Schedule X and narcotic items are strictly prohibited online; Schedule H1 sales are logged to a statutory register.
-     - DPDP Act 2023: Prescriptions are encrypted at rest with Fernet (AES-128-CBC with HMAC-SHA256), access is logged in a tamper-evident audit trail, and minor profiles require explicit guardian consent.
+     - DPDP Act 2023: Prescriptions are encrypted at rest with Fernet (AES-128-CBC with HMAC-SHA256), access is logged in an audit log (append-only table; not cryptographically tamper-proof), and minor profiles require explicit guardian consent.
    - **Routing Engine:** Automatically calculates distance from customer delivery area to stores holding complete inventory from daily stock records.
    - **CORS Support:** Full cross-origin resource sharing configured to allow standalone Next.js deployments on Vercel.
 

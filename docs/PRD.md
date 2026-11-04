@@ -203,7 +203,7 @@ Company A runs 46 stores across Kolkata and Howrah and a central warehouse, with
 - **A2:** Customer delivery areas are four sample Kolkata/Howrah zones.
 - **A3:** Razorpay/UPI integration is a **TEST-MODE SIMULATION** (no real money moves).
 - **A4:** Doctor registration structural checks run on synthetic demo prescriptions only.
-- **A5:** Inter-store stock transfers from Taratala Central Warehouse are implemented to solve stockouts.
+- **A5:** Inter-store stock transfers from the central warehouse are implemented to solve stockouts.
 - **A6:** A public 46-store directory (`/stores`) and statutory compliance center (`/compliance`) are provided.
 - **A7:** Chronic auto-refill subscriptions engine (`/api/subscriptions`) runs on 30/60/90 day intervals.
 - **A8:** Prescriptions are assumed valid for 180 days (`RX_VALID_DAYS = 180` in `rules.py`) for chronic refills.

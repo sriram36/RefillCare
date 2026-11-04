@@ -28,7 +28,7 @@ const STORES: StoreInfo[] = [
     id: 100,
     name: "RefillCare Central Warehouse & Cold Chain Hub",
     zone: "Central Hub",
-    address: "Taratala Industrial Area, Phase II, Kolkata",
+    address: "Central Distribution Facility, Kolkata",
     pincode: "700088",
     phone: "+91 33 2401 9900",
     timing: "24 Hours / 7 Days",
@@ -459,7 +459,7 @@ export default function StoresPage() {
             46 Neighborhood Pharmacies in Kolkata &amp; Howrah
           </h1>
           <p className="text-sm text-slate-600 leading-relaxed">
-            Every store is staffed with registered West Bengal Medical/Pharmacy Council pharmacists, stocked with chronic diabetes, cardiac, and thyroid formulations, and connected to our <strong>Central Warehouse at Taratala</strong> for same-day inter-store replenishment.
+            Every store is staffed with registered West Bengal Medical/Pharmacy Council pharmacists, stocked with chronic diabetes, cardiac, and thyroid formulations, and connected to our <strong>Central Warehouse</strong> for same-day inter-store replenishment.
           </p>
         </div>
 

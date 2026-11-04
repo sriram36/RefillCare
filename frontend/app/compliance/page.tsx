@@ -72,7 +72,7 @@ export default function CompliancePage() {
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Statutory Schedule H1 Register:</strong> Separate tamper-evident digital records are maintained with prescriber name, council registration number, patient details, and quantity dispensed for 3 years.
+                  <strong>Statutory Schedule H1 Register:</strong> Separate digital records (append-only table; not cryptographically tamper-proof) are maintained with prescriber name, council registration number, patient details, and quantity dispensed for 3 years.
                 </span>
               </li>
             </ul>
@@ -93,7 +93,7 @@ export default function CompliancePage() {
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
                 <span>
-                  <strong>AES-256 Prescription Encryption:</strong> All uploaded prescription photos are encrypted in flight and at rest with cryptographic Fernet keys in isolated cloud blob storage.
+                  <strong>Fernet (AES-128-CBC with HMAC-SHA256) Prescription Encryption:</strong> All uploaded prescription photos are encrypted in flight and at rest with cryptographic Fernet keys in isolated cloud blob storage.
                 </span>
               </li>
               <li className="flex items-start gap-2">
@@ -197,14 +197,12 @@ export default function CompliancePage() {
               <p className="text-slate-500 text-[11px]">Healthcare Compliance Counsel</p>
             </div>
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
-              <span className="text-slate-400 font-semibold">Email &amp; Direct Phone:</span>
+              <span className="text-slate-400 font-semibold">Email Contact:</span>
               <p className="font-bold text-teal-800">dpo@refillcare.kolkata.in</p>
-              <p className="text-slate-500 text-[11px]">+91 33 2401 9911 (Mon–Sat, 10 AM – 6 PM)</p>
             </div>
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
               <span className="text-slate-400 font-semibold">Office Address:</span>
               <p className="font-bold text-slate-800">RefillCare Central Operations</p>
-              <p className="text-slate-500 text-[11px]">Taratala Industrial Area, Phase II, Kolkata 700088</p>
             </div>
           </div>
 
