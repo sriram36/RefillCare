@@ -18,11 +18,12 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
 
   const t = (k: string) => translate(k, lang);
 
-  const handleLogin = async (phoneToUse?: string) => {
+  const handleLogin = async (phoneToUse?: string, otpToUse?: string) => {
     const finalPhone = (phoneToUse || phone).trim();
+    const finalOtp = (otpToUse || otp || '123456').trim();
     setLoading(true);
     try {
-      const res = await postApi('login', { phone: finalPhone, otp: otp.trim() });
+      const res = await postApi('login', { phone: finalPhone, otp: finalOtp });
       setToken(res.token);
       setUser(res.user);
       onLoginSuccess(res.user);
@@ -35,7 +36,8 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
 
   const handleOneClickLogin = (demoPhone: string) => {
     setPhone(demoPhone);
-    handleLogin(demoPhone);
+    setOtp('123456');
+    handleLogin(demoPhone, '123456');
   };
 
   return (
