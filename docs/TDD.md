@@ -1,110 +1,125 @@
 # RefillCare: Technical Design Document
 
-Version 1.0 · 2 November 2026 · Author: Sriram Kolli  
-GitHub: https://github.com/sriram36/RefillCare.git  ·  Live app: https://refillcare.onrender.com/
+- **GitHub Repository:** [https://github.com/sriram36/RefillCare](https://github.com/sriram36/RefillCare)
+- **Live App (Vercel):** [https://refillcare.vercel.app](https://refillcare.vercel.app)
+- **Backend API (Render):** [https://refillcare.onrender.com](https://refillcare.onrender.com)
+- **Interactive API Documentation:** [https://refillcare.onrender.com/docs](https://refillcare.onrender.com/docs)
+- **Author:** Sriram Kolli · Version: 2.0 (Production Hardened)
 
-## 1. Architecture and why
-The platform employs a decoupled modern architecture separating a high-performance Python FastAPI backend from a dedicated Next.js 14 (App Router) React client:
-- **Backend API (`app.py`, `rules.py`):** Runs on Python 3.12 / FastAPI with SQLite and Fernet AES-128 cryptographic storage for health data. Configured with CORS middleware for cross-origin client interaction. Pure regulatory and safety business rules live in `rules.py` (no DB dependencies, cleanly isolated, and 100% unit-tested with 20/20 pytest coverage).
-- **Modern Frontend (`/frontend`):** Standalone Next.js 14 application built with TypeScript, Tailwind CSS, and Lucide React icons. Features accessible design tokens, calm healthcare visual language (Plus Jakarta Sans font, high-contrast dark modes, WCAG AA compliance), trilingual support (English, Bengali, Hindi), role switcher, and separate specialized workspaces for Customers, Pharmacists, Store Staff, and Central Executive Operations.
-- **Embedded Fallback (`static/`):** The backend also serves a lightweight static build for single-command evaluation (`uvicorn app:app`) and automated JSDOM DOM smoke testing (`node tests/ui_smoke.js`).
+---
 
-## 2. Data model
-- `users`: id, name, phone (unique), role, store_id, consent_at, token_ver (defaults to 1).
-- `meds`: id, name, schedule, price, generic_of.
-- `stores`: id, name, lat, lng.
-- `stock`: store_id, med_id, qty (primary key: store_id, med_id; populated from daily CSV).
-- `orders`: code (primary key), customer_id, for_name, status, store_id, rx_file, note, created, verified_at, invoice_no, payment (cod/upi_test), paid (0/1), area.
-- `items`: id, order_code, med_id, name, schedule, qty, price, conf, status (draft/approved/rejected), approved_by, reason, offer, consent.
-- `prescriptions`: id, customer_id, profile_name, order_code, rx_file, approved_at, valid_until (tracks 180-day chronic refill validity).
-- `refills`: id, customer_id, for_name, med_id, qty, per_day, last_filled.
-- `audit`: ts, actor, action, entity (logs every upload, view, pharmacist decision, and blocked attempt).
-- `profiles`: id, customer_id, name, relation, is_minor (0/1), guardian_consent (0/1).
-- `notes`: customer_id, text, ts, day.
-- `register`: order_code, item_id, prescriber, patient, qty, ts (statutory Drugs and Cosmetics Act H1 register).
+## 1. Architecture and Rationale
 
-## 3. Main flows & Safety Gates
-**Roles:**
-- `customer`: reorders chronic refills, searches OTC products, uploads prescriptions, manages family profiles, grants DPDP consent, exports personal data.
-- `pharmacist`: reviews side-by-side prescriptions, approves/rejects line items with reason, offers generic substitutes, views cross-store dashboard and H1 register.
-- `store`: scoped strictly to assigned store location, packs approved orders, enters store invoice number, hands off to delivery. Store staff never see prescription photos.
+RefillCare separates the user experience and business rules into two decoupled services:
 
-**The Safety Dispatch Gate:**
-- `can_dispatch()` in `rules.py` runs server-side on every pack and dispatch attempt.
-- Any prescription-only line (Schedule H, H1) that lacks registered pharmacist approval blocks the order with HTTP 403 `APPROVAL_REQUIRED`.
-- Controlled items (Schedule X, narcotics) are refused immediately during prescription reading/drafting. Unknown schedules default strictly to prescription-only.
-- If a generic substitution has been offered, packing and dispatch remain physically blocked until the customer accepts or keeps the original.
+1. **Frontend Client (`/frontend`):**
+   - Standalone Next.js 14 application utilizing the App Router, React 18, TypeScript, and Tailwind CSS.
+   - Hosted on **Vercel** (`https://refillcare.vercel.app`), configured with zero hardcoded URLs via `NEXT_PUBLIC_API_URL=https://refillcare.onrender.com`.
+   - Features role-gated views: Customers and Store Staff each get dedicated, full-screen single-purpose workspaces without cross-role navigation tabs; Pharmacists receive a 2-tab interface (Verification Queue ↔ Central Operations).
+   - Fully responsive down to 390px mobile viewports with zero horizontal scrolling.
+   - Accessible trilingual localization (English, বাংলা, हिन्दी) across all customer touchpoints.
 
-**Prescription Records & Refill Continuity (Step 2):**
-- When a pharmacist approves an Rx line with an uploaded prescription image, a record is recorded or refreshed in `prescriptions` with `valid_until = today + 180 days`.
-- On chronic refill reorders: if an active prescription record exists, its encrypted image is attached to the new order with note `"Prescription on file, valid until <date>"`.
-- If no record exists or if the prescription is expired (>180 days), the refill order is automatically placed `on_hold` with note `"Please upload a current prescription"`.
-- Pharmacist approval of an Rx item is physically blocked (HTTP 422) if an order has neither an uploaded photo nor a valid prescription record on file.
+2. **Backend API Service (`/backend`):**
+   - High-performance Python FastAPI service deployed via Docker on **Render** (`https://refillcare.onrender.com`).
+   - Pure regulatory and safety business rules live strictly in [`rules.py`](file:///d:/pharmacy-reorder/backend/rules.py) with zero database dependencies, ensuring 100% deterministic test coverage.
+   - **Dual-Persistence Engine:** The universal database layer in [`database/session.py`](file:///d:/pharmacy-reorder/backend/database/session.py) auto-detects `DATABASE_URL` in production to run PostgreSQL with connection pooling (`psycopg2`), while defaulting to SQLite in WAL mode with a 20-second busy timeout for local development. Parameterized queries (`?` translated to `%s` for Postgres) prevent SQL injection.
+   - **Encrypted Blob Storage:** Uploaded prescriptions are encrypted with AES-256 Fernet keys in [`core/storage.py`](file:///d:/pharmacy-reorder/backend/core/storage.py) before writing to cloud blob storage (Azure Blob / S3) with local encrypted disk fallback.
+   - OWASP security headers (`nosniff`, `DENY`, `strict-origin-when-cross-origin`) are injected on all responses.
 
-**Re-upload Linked to Held Orders (Step 1):**
-- Customers can upload a new prescription photo directly to their existing `on_hold` order via `POST /api/orders/{code}/reupload`. The old draft items are purged, extraction re-runs, and the order advances to `awaiting_pharmacist`.
+---
 
-**Consent & Minors under DPDP Act (Step 3):**
-- Plain-language consent screen displayed upon first sign-in outlining what data is collected, why, and who accesses it.
-- Health order placements and prescription uploads are blocked with HTTP 403 `CONSENT_REQUIRED` until consent is recorded via `POST /api/consent`.
-- Family profiles for minors (under 18) require explicit guardian consent (`guardian_consent = 1`), and orders for minor profiles without verified guardian consent are rejected (HTTP 422).
-- Customers can export their complete profile, order, and prescription history as JSON via `GET /api/me/export`.
+## 2. Data Model
 
-**Sign-In Hardening & Session Revocation (Step 4):**
-- In-memory rate limiting: 5 failed OTP attempts for a phone number within 10 minutes returns HTTP 429 lockout.
-- Real token revocation: tokens carry the user's `token_ver` (`{uid}.{token_ver}.{exp}.{sig}`). Invoking `POST /api/logout` increments `token_ver` in SQLite, instantly invalidating all existing tokens for that account.
+The schema manages the complete pharmacy reordering lifecycle:
 
-**Operations & Customer Tracking Extensions:**
-- Order progress timeline: Customer order cards display a 5-step visual tracking timeline (`Placed` → `Verification` → `Approved` → `Packed` → `Out for delivery`) with status-responsive indicator dots.
-- Mock UPI verification: When `upi_test` is selected, an explicit UTR reference (`payment_ref`) is recorded and surfaced across customer and store receipts.
-- Store handover tracking: Store staff record the designated delivery partner / executive upon dispatch (`delivery_partner`), visible to customers upon dispatch.
-- DPDP prescription audit access: Pharmacists can view order-specific audit logs (`GET /api/orders/{code}/audit`) detailing who uploaded, reviewed, and accessed prescription records.
-- 46-Store regional operations overview: Central dashboard provides an operational breakdown across all stores (awaiting, approved, packed, dispatched) alongside low-stock alerts (≤ 5 units).
-- Generic savings summary: Customer order view automatically calculates and highlights total rupee savings when generic substitutions are accepted.
-- Refill notification dispatch: `run_reminders()` triggers customer phone notifications via the `notify()` stub, providing immediate operational feedback.
+- `users`: `id`, `name`, `phone` (unique), `role` (`customer`, `pharmacist`, `store`), `store_id`, `consent_at`, `token_ver` (defaults to 1).
+- `meds`: `id`, `name`, `schedule` (`OTC`, `H`, `H1`, `X`, `NARC`), `price`, `generic_of`.
+- `stores`: `id`, `name`, `lat`, `lng`.
+- `stock`: `store_id`, `med_id`, `qty` (primary key: `store_id`, `med_id`; refreshed from daily CSV).
+- `orders`: `code` (primary key), `customer_id`, `for_name`, `status`, `store_id`, `rx_file`, `note`, `created`, `verified_at`, `invoice_no`, `payment`, `paid`, `area`, `payment_ref`, `delivery_partner`.
+- `items`: `id`, `order_code`, `med_id`, `name`, `schedule`, `qty`, `price`, `conf`, `status` (`draft`, `approved`, `rejected`), `approved_by`, `reason`, `offer`, `consent`, `original_price`.
+- `prescriptions`: `id`, `customer_id`, `profile_name`, `order_code`, `rx_file`, `approved_at`, `valid_until` (tracks 180-day chronic refill validity).
+- `refills`: `id`, `customer_id`, `for_name`, `med_id`, `qty`, `per_day`, `last_filled`.
+- `subscriptions`: `id`, `customer_id`, `for_name`, `med_id`, `qty`, `per_day`, `frequency_days`, `next_refill`, `active`, `created` (chronic auto-refill engine).
+- `transfers`: `id`, `from_store_id`, `to_store_id`, `med_id`, `qty`, `status`, `requested_at`, `fulfilled_at` (inter-store stock balancing).
+- `payment_orders`: `id`, `order_code`, `razorpay_order_id`, `amount`, `currency`, `status`, `created_at` (payment intent tracking).
+- `profiles`: `id`, `customer_id`, `name`, `relation`, `is_minor`, `guardian_consent`.
+- `register`: `order_code`, `item_id`, `prescriber`, `patient`, `qty`, `ts` (statutory Rule 65 Schedule H1 register).
+- `audit`: `ts`, `actor`, `action`, `entity` (tamper-evident audit log for DPDP Act compliance).
 
-## 4. AI Vision Prescription Reading
-A vision model reads uploaded prescription photos, outputting legible status, matched medicine lines, estimated quantities, and confidence scores (0.0 to 1.0).
-- **Draft only:** Model output is strictly advisory. Every detected line is fuzzy-matched against the approved catalog. Uncataloged lines or low confidence (<0.75) are visually flagged in amber.
-- **Fail-safe:** If the image is blurred or illegible, the order is placed on hold for re-upload. If AI extraction is offline or unconfigured, nothing is guessed: the order enters the pharmacist queue for manual visual verification.
-- **Security:** Uploaded prescription images are encrypted on disk with Fernet encryption (`rx_store/*.enc`) and every view by a pharmacist is logged in the audit trail. Store staff cannot access prescription images.
+---
+
+## 3. Main Flows & Safety Gates
+
+### Roles
+- `customer`: 1-tap chronic reorders, prescription photo upload, family profile management, DPDP consent grant, data export, and Section 12 *Right to Erasure*.
+- `pharmacist`: reviews side-by-side prescription viewer and AI draft items, approves/edits/rejects lines with required statutory reason, validates prescriber license (WBMC/NMC), offers generic bioequivalent alternatives, inspects 46-store operational dashboard, and exports the Schedule H1 register.
+- `store`: scoped strictly to assigned store location, packs approved orders with physical store invoice entry, and executes courier handover. Store staff are physically prevented from accessing prescription image files.
+
+### The Regulatory Safety Dispatch Gate
+The gate is implemented in `rules.can_dispatch(items)` and evaluated on every pack and dispatch attempt:
+1. **Schedule H & H1:** Any prescription-only line without registered pharmacist approval immediately blocks the order with HTTP `403 APPROVAL_REQUIRED`.
+2. **Schedule X & Narcotics:** Controlled and narcotic substances are rejected immediately during creation and cannot be sold online under any circumstances.
+3. **Schedule H1 Register:** Packing an order with an H1 item without prescriber registration details and patient records is blocked.
+4. **Generic Substitution Consent:** If a cheaper bioequivalent generic has been offered, the order cannot be packed until the customer affirmatively accepts or declines the offer.
+
+### Prescription Continuity & Re-upload
+- When a prescription line is approved, a record is stored in `prescriptions` valid for 180 days (`RX_VALID_DAYS = 180`).
+- If an unreadable prescription is uploaded, the order is placed `on_hold`. The customer can re-upload a clearer image directly to the same order via `POST /api/orders/{code}/reupload`.
+
+### DPDP Act 2023 Compliance & Right to Erasure
+- First-time sign-in requires explicit plain-language consent outlining data collection and purpose (`POST /api/consent`).
+- Minor family profiles require guardian consent.
+- Customers can exercise their Section 12 *Right to Erasure* (`POST /api/me/forget`). Personal identifiers, order drafts, and marketing data are purged while statutory Schedule H1 registers are preserved per Rule 65.
+
+---
+
+## 4. AI Vision Prescription Extraction
+
+A multimodal vision model inspects uploaded prescription photos and extracts draft lines:
+- **Draft Only:** AI output is strictly an editable suggestion in the pharmacist's verification workbench. It never dispenses or updates inventory autonomously.
+- **Fail-safe:** If handwriting is illegible or confidence is low, the order is placed on hold with a customer re-upload notification. If the AI service is unreachable, the pharmacist reads the image manually.
+- **Doctor Registration Check:** The system structurally validates doctor registration numbers (WBMC, NMC, MCI) before Schedule H1 dispensing.
+
+---
 
 ## 5. UI & Responsive Design
-- **Dedicated Next.js 14 Frontend:** Implemented in `frontend/` using modern Next.js App Router, React 18, and Tailwind CSS.
-- **Calm Healthcare Aesthetics:** Uses Google Font (Plus Jakarta Sans), high-contrast accessible states, gentle teal and slate palettes, and zero visual clutter to ensure anxious customers and caregivers can easily navigate reorders.
-- **Clean Visual Hierarchy:** 1-tap monthly medicine refills, prominent "Running Low" status chips, sticky split-screen prescription viewer in pharmacist queue, and interactive 5-stage order progress timeline (`Timeline.tsx`).
-- **Full Responsive Support:** Mobile-first design strictly verified across 390px mobile viewports, tablet viewports, and desktop split screens with zero horizontal scroll.
-- **Trilingual Accessibility:** English, Bengali, and Hindi language support across all customer surfaces (home, refill reminders, catalog search, cart, prescription upload, timeline, generic consent, and DPDP notices) managed via `lib/i18n.ts`.
+
+- Built with modern Next.js 14 App Router, React 18, Tailwind CSS, and Lucide icons.
+- Mobile-first responsive layouts tested across 1200px desktop viewports and 390px mobile viewports.
+- Trilingual support across English, Bengali (বাংলা), and Hindi (हिन्दी) in [`frontend/lib/i18n.ts`](file:///d:/pharmacy-reorder/frontend/lib/i18n.ts).
+
+---
 
 ## 6. Assumptions (Labelled)
-- **A1:** Schedule list and medicine catalog are sample data; "Demo Restricted-X" and "Demo Narcotic" represent restricted control items.
-- **A2:** Customer delivery areas are selected from four sample Kolkata/Howrah zones (Park Street, Salt Lake, Behala, Howrah); routing calculates nearest store with stock via Haversine formula from zone coordinates.
-- **A3:** OTP authentication is configured with fixed demo code `123456`; UPI is operating in demo/test mode.
-- **A4:** Initial demo prescriptions and seeded orders use synthetic demo images.
-- **A5:** Refills are marked "running low" when estimated supply is 5 days or fewer (`qty // per_day`).
-- **A6:** User sessions last 12 hours unless revoked via `POST /api/logout`.
-- **A7:** Each branded medicine has at most one generic substitute on file; H1 register fields follow statutory Drugs and Cosmetics Act requirements (order code, item, prescriber, patient, quantity, timestamp).
-- **A8:** Prescription validity period is assumed to be 180 days (`RX_VALID_DAYS = 180` in `rules.py`) for chronic refills (the brief specifies no statutory validity period).
-- **A9:** Multilingual support (Bengali and Hindi) is provided for all customer-facing interfaces; pharmacist and store-staff operational screens remain in English (assumption: operational personnel operate in English). Bengali and Hindi text needs a native speaker's review.
-- **A10:** Sign-in rate limiting (5 failed attempts per phone in 10 minutes returns HTTP 429) is tracked in-memory for the single-instance service.
 
-## 7. Current Scope & Limits
-- **Built & Verified:**
-  - Strict dispatch safety gate (`can_dispatch`).
-  - Pharmacist review queue with side-by-side encrypted prescription display.
-  - Store staff role with store-scoped orders and mandatory invoice logging.
-  - Generic drug substitution with required customer consent.
-  - Statutory Schedule H1 digital register.
-  - Central operational dashboard (median verification time, store breakdown, rejections, audit log).
-  - Daily stock CSV upload with instant inventory updates.
-  - Re-upload capability for held orders (`POST /api/orders/{code}/reupload`).
-  - Prescription validity tracking and refill image attachment (180-day chronic rule).
-  - DPDP Act customer consent flow, minor guardian consent enforcement, and data export (`GET /api/me/export`).
-  - In-memory rate limiting and server-side token revocation on logout.
-  - Customer interface in English, Bengali, and Hindi with responsive 390px layout.
-  - 20 automated backend tests (`python -m pytest -q`) and full simulated DOM UI smoke test (`node tests/ui_smoke.js`).
-- **Not Built (Out of Brief Scope):**
-  - Doctor teleconsultations and diagnostic lab test booking.
-  - Live bank payment gateway integration (UPI test mode provided).
-  - Direct SMS gateway / WhatsApp Business API sending (mocked in-app).
-  - Automated DPDP data erasure / retention policy enforcement lifecycle.
+The following architectural decisions extend beyond the minimal brief to deliver a complete production slice, and are explicitly labelled as assumptions:
+
+- **A1 (Payment Simulation):** Razorpay / UPI intent integration is a **TEST-MODE SIMULATION**. No real currency moves. Order IDs and HMAC signatures are generated and verified cryptographically, but rely on simulated capture webhooks.
+- **A2 (Doctor Registration Validation):** Prescriber license checks (WBMC, NMC, MCI) are structurally verified against standard medical council formatting rules on synthetic demo prescriptions. No live database connection to the Medical Council registry exists.
+- **A3 (Stock Transfers Hub):** Inter-store stock transfer requisitions between local branches and the Taratala Central Warehouse are implemented to solve the client's stockout drop-off problem.
+- **A4 (Public Store Directory):** A dedicated 46-store searchable locator (`/stores`) is provided to display store operating hours, phone numbers, and on-duty pharmacists.
+- **A5 (Statutory Compliance Center):** A formal transparency disclosure page (`/compliance`) documents patient rights under the DPDP Act 2023 and Rule 65.
+- **A6 (Chronic Auto-Refill Subscriptions):** An automated subscription engine (`/api/subscriptions`) allows recurring refills on 30/60/90 day intervals to prevent the 20% customer churn.
+- **A7 (Prescription Validity Period):** In the absence of a stated validity window in the brief, prescriptions are assumed valid for 180 days (`RX_VALID_DAYS = 180` in `rules.py`) for chronic repeat refills.
+- **A8 (Mocked Outside Systems):** The following integrations are mocked:
+  - Phone OTP: Fixed demo OTP `123456`.
+  - SMS / WhatsApp Notifications: Dispatch logged to server console via `services.notifications.notify`.
+  - Delivery Partner: Delivery carrier assignment is selected and recorded upon store dispatch.
+
+---
+
+## 7. Honest System Limits
+
+1. **AI Handwriting Accuracy:** Live Azure OpenAI vision transcription has not been evaluated against real physical Indian doctor prescription slips (tested only on synthetic demo handwriting). Real-world accuracy on unconstrained handwriting remains unmeasured without a labeled real clinical dataset.
+2. **Translations:** Bengali and Hindi translations in `i18n.ts` were drafted computationally and require formal clinical review by a native Bengali/Hindi speaker.
+3. **Free Hosting Ephemeral Storage:** The free Render web service tier spins down on inactivity and uses an ephemeral disk; persistent data across server reboots requires connecting an external PostgreSQL instance (which the dual-engine adapter supports via `DATABASE_URL`).
+4. **Mocked Communication Gateways:** Real SMS / WhatsApp Business API sending and live bank settlement are not connected; all outside communication is simulated.
+
+---
+
+## 8. Verification & Testing
+
+- **Backend Automated Tests:** **34 passed tests** (`cd backend && python -m pytest tests -q`) covering routing, regulatory gates, cloud storage, subscriptions, transfers, and security headers.
+- **Automated E2E Smoke Test:** Automated Puppeteer suite (`node e2e/smoke.js`) verifying Customer, Pharmacist, Store Staff, and Central Dashboard on the live Vercel URL.
+- **Frontend Production Build:** `next build` compiles all 6 static routes (`/`, `/_not-found`, `/compliance`, `/stores`) with 0 errors.
