@@ -19,7 +19,7 @@ An AI model reads uploaded prescriptions, but only as a draft. A human registere
 
 ## 2. Background and Problem
 
-Company A runs 46 stores across Kolkata and Howrah and a central warehouse, with 380 staff and revenue of ₹180–210 crore a year. A large share of sales is repeat medicine for diabetes, blood pressure and thyroid.
+Company A runs a 46-store pharmacy network across Kolkata and Howrah and a central warehouse, with 380 staff and revenue of ₹180–210 crore a year. The implementation seeds and runs the 3 stores from the brief (Salt Lake, Behala, Howrah Maidan). A large share of sales is repeat medicine for diabetes, blood pressure and thyroid.
 
 **Today:** customers call or WhatsApp a store with a photo of the prescription. Pharmacists check stock and reply, and staff deliver locally. Refills depend on the customer remembering. Prescriptions sit on store phones, and stores cannot see each other’s stock.
 
@@ -202,7 +202,7 @@ Company A runs 46 stores across Kolkata and Howrah and a central warehouse, with
 - **A1:** Catalog and Schedule classifications are sample data.
 - **A2:** Customer delivery areas are four sample Kolkata/Howrah zones.
 - **A3:** Razorpay/UPI integration is a **TEST-MODE SIMULATION** (no real money moves).
-- **A4:** Doctor registration structural checks run on synthetic demo prescriptions only.
+- **A4:** Doctor registration number: format check only; informational; does not block dispensing. Structural check runs on synthetic demo prescriptions only.
 - **A5:** Inter-store stock transfers from the central warehouse are implemented to solve stockouts.
 - **A6:** A statutory compliance center (`/compliance`) is provided.
 - **A7:** Chronic auto-refill subscriptions engine (`/api/subscriptions`) runs on 30/60/90 day intervals.

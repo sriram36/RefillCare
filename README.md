@@ -118,7 +118,7 @@ pip install -r requirements.txt
 # Start backend server
 python -m uvicorn app:app --port 8000 --reload
 ```
-The database and sample seed data (46 stores, sample patients, medicines, and encrypted demo prescriptions) are created automatically on first run.
+The database and sample seed data (the 3 stores from the brief: Salt Lake, Behala, Howrah Maidan, sample patients, medicines, and encrypted demo prescriptions) are created automatically on first run.
 
 #### 2. Start Frontend
 ```bash

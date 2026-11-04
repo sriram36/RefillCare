@@ -10,7 +10,7 @@
 
 ## 1. Architecture and Rationale
 
-RefillCare separates the user experience and business rules into two decoupled services:
+RefillCare is an end-to-end pharmacy reordering platform designed for Company A's 46-store retail chain in Kolkata and Howrah. The live database seeds and runs the 3 specific sample stores given in the brief (Store 1: Salt Lake, Store 2: Behala, Store 3: Howrah Maidan) along with the central warehouse. The architecture separates user experience and business rules into two decoupled services:
 
 1. **Frontend Client (`/frontend`):**
    - Standalone Next.js 14 application utilizing the App Router, React 18, TypeScript, and Tailwind CSS.
@@ -34,7 +34,7 @@ The schema manages the complete pharmacy reordering lifecycle:
 
 - `users`: `id`, `name`, `phone` (unique), `role` (`customer`, `pharmacist`, `store`), `store_id`, `consent_at`, `token_ver` (defaults to 1).
 - `meds`: `id`, `name`, `schedule` (`OTC`, `H`, `H1`, `X`, `NARC`), `price`, `generic_of`.
-- `stores`: `id`, `name`, `lat`, `lng`.
+- `stores`: `id`, `name`, `lat`, `lng` (seeds the 3 stores from the brief: Store 1: Salt Lake, Store 2: Behala, Store 3: Howrah Maidan).
 - `stock`: `store_id`, `med_id`, `qty` (primary key: `store_id`, `med_id`; refreshed from daily CSV).
 - `orders`: `code` (primary key), `customer_id`, `for_name`, `status`, `store_id`, `rx_file`, `note`, `created`, `verified_at`, `invoice_no`, `payment`, `paid`, `area`, `payment_ref`, `delivery_partner`.
 - `items`: `id`, `order_code`, `med_id`, `name`, `schedule`, `qty`, `price`, `conf`, `status` (`draft`, `approved`, `rejected`), `approved_by`, `reason`, `offer`, `consent`, `original_price`.
@@ -112,8 +112,8 @@ The following architectural decisions extend beyond the minimal brief to deliver
 
 1. **AI Handwriting Accuracy:** Live Azure OpenAI vision transcription has not been evaluated against real physical Indian doctor prescription slips (tested only on synthetic demo handwriting). Real-world accuracy on unconstrained handwriting remains unmeasured without a labeled real clinical dataset.
 2. **Translations:** Bengali and Hindi translations in `i18n.ts` were drafted computationally and require formal clinical review by a native Bengali/Hindi speaker.
-3. **Free Hosting Ephemeral Storage:** The free Render web service tier spins down on inactivity and uses an ephemeral disk; persistent data across server reboots requires connecting an external PostgreSQL instance (which the dual-engine adapter supports via `DATABASE_URL`).
-4. **Mocked Communication Gateways:** Real SMS / WhatsApp Business API sending and live bank settlement are not connected; all outside communication is simulated.
+3. **Free Hosting Ephemeral Storage & Cold Starts:** The free Render web service tier sleeps after 15 minutes of inactivity (~50-second cold start) and resets ephemeral SQLite disk storage on restart. Connecting an external PostgreSQL instance (which the dual-engine adapter supports via `DATABASE_URL`) ensures permanent persistence.
+4. **Mocked Outside Systems:** No live SMS, WhatsApp Business API, UPI banking rail, or logistics carrier API is connected; all outside communication and payment flows are safe test simulations.
 
 ---
 
