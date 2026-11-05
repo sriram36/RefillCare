@@ -259,7 +259,13 @@ export default function PharmacistView({ user, lang, onToast, onOpenDashboard }:
       </div>
 
       {loading && orders.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">Loading orders...</div>
+        <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 space-y-3">
+          <div className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div className="text-sm font-semibold text-slate-700">Loading verification queue…</div>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            (Render backend cold-start may take up to 45s on first wake-up)
+          </p>
+        </div>
       ) : orders.length === 0 ? (
         <div className="bg-white p-8 text-center rounded-xl border border-slate-200 text-slate-500">
           No orders pending verification in the queue.

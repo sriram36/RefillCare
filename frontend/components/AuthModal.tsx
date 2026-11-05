@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Phone, KeyRound, ArrowRight, UserCheck, Shield, Store, User, Sparkles } from 'lucide-react';
+import { Phone, KeyRound, ArrowRight, UserCheck, Shield, Store, User, Sparkles, Clock } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 import { postApi, setToken, setUser } from '../lib/api';
 
@@ -153,7 +153,26 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
             </div>
           </button>
         </div>
+
+        {/* Note on Render Cold Start */}
+        <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-slate-500 text-center border-t border-teal-100/80">
+          <Clock className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+          <span>Note: Render free tier spins down after idle; first request may take ~30–45s to wake up.</span>
+        </div>
       </div>
+
+      {/* Live Cold-Start Loading Notification */}
+      {loading && (
+        <div className="rounded-2xl border-2 border-teal-400 bg-teal-50/95 p-4 text-center shadow-sm space-y-2 animate-in fade-in duration-200">
+          <div className="flex items-center justify-center gap-2.5 text-teal-950 font-bold text-sm">
+            <div className="w-4 h-4 border-2 border-teal-700 border-t-transparent rounded-full animate-spin shrink-0" />
+            <span>Connecting to RefillCare Server…</span>
+          </div>
+          <p className="text-xs text-teal-800 leading-relaxed max-w-sm mx-auto">
+            Backend is hosted on Render free tier. If the server is waking up from sleep, cold start may take 30–45 seconds on first request. Please wait, authenticating now!
+          </p>
+        </div>
+      )}
 
       {/* Manual Phone & OTP Sign In Card */}
       <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm space-y-5">

@@ -287,7 +287,10 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
     return (
       <div className="flex flex-col items-center justify-center py-24 space-y-4">
         <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
-        <div className="text-sm font-medium text-slate-500">Loading your health records & prescriptions…</div>
+        <div className="text-sm font-semibold text-slate-700">Loading your health records & prescriptions…</div>
+        <p className="text-xs text-slate-400 max-w-sm text-center">
+          (Render backend cold-start may take up to 45s on first wake-up)
+        </p>
       </div>
     );
   }

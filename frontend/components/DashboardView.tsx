@@ -105,6 +105,9 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
           <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
           Loading Central Operations Dashboard…
         </div>
+        <div className="text-[11px] text-slate-400 text-center">
+          (Render backend cold-start may take up to 45s on first wake-up)
+        </div>
       </div>
     );
   }

@@ -235,7 +235,13 @@ export default function StoreView({ user, lang, onToast }: StoreViewProps) {
           )}
         </div>
       ) : loading && orders.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">Loading store orders...</div>
+        <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 space-y-3">
+          <div className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div className="text-sm font-semibold text-slate-700">Loading store orders…</div>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            (Render backend cold-start may take up to 45s on first wake-up)
+          </p>
+        </div>
       ) : orders.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 flex flex-col items-center justify-center space-y-4 text-center">
           <div className="p-4 rounded-full bg-emerald-50">
