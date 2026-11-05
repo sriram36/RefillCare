@@ -19,16 +19,16 @@ Reviewers can verify the core regulatory gates and workflows in under 3 minutes 
    - Notice order `RX-50214` (Telmisartan 40 mg, Schedule H) has a disabled button: *"Awaiting Pharmacist Check"*.
    - Attempting to pack or dispatch without registered pharmacist approval is strictly blocked by the backend with HTTP `403 APPROVAL_REQUIRED`.
 2. **Review Prescription & Doctor License as Pharmacist**
-   - Sign out and click 1-tap login for **Anita Rao (Pharmacist)** (`9000000099`).
+   - Sign out and click 1-tap login for **Anita Rao** (`9000000099`).
    - In the verification queue, review `RX-50214` side-by-side with the prescription viewer, inspect the doctor's WBMC registration check badge, and click **Approve Line**.
    - Notice how generic bioequivalent substitution (Janaushadhi) can be offered with 1 click.
 3. **Inspect the Executive Dashboard**
    - Click the **Central Operations** tab in the top header.
    - View real-time fulfillment KPIs across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), verification SLA (< 10 min vs target), stock levels, and drop-off prevention metrics.
 4. **Test Prescription OCR & AI Vision Parsing**
-   - Sign in as **Customer (Debasish Ghosh)** (`9000000001`).
+   - Sign in as **Debasish Ghosh** (`9000000001`) or **Rina Sen** (`9000000002`).
    - In the **Upload Prescription** section, choose a verified demo chip (e.g. *Clear Printed*, *Handwritten Rx*, *Blurry Photo*, or *Schedule X*) or upload any PNG/JPEG image file.
-   - Click **Submit Prescription Order**, then switch to **Anita Rao (Pharmacist)** (`9000000099`) to view the extracted medicines with confidence ratings and side-by-side image verification. Blurry images automatically go *On Hold*, and Schedule X items are automatically flagged *Rejected*.
+   - Click **Submit Prescription Order**, then switch to **Anita Rao** (`9000000099`) to view the extracted medicines with confidence ratings and side-by-side image verification. Blurry images automatically go *On Hold*, and Schedule X items are automatically flagged *Rejected*.
 
 ---
 
@@ -157,17 +157,17 @@ Open `http://localhost:3000` in your browser.
 
 ## 6. Pre-seeded Demo Logins
 
-All accounts use the demo OTP: `123456`
+All accounts feature dedicated 1-tap login buttons on the sign-in screen (Demo OTP: `123456`):
 
-| Persona | Name / Store | Phone | Primary Role / Action |
+| Persona | 1-Tap Button Label | Phone | Primary Role / Action |
 |---|---|---|---|
 | **Customer** | Debasish Ghosh | `9000000001` | 1-tap reorder (Metformin for Mother, 4 days left) |
 | **Customer** | Rina Sen | `9000000002` | Telmisartan refill, generic substitute consent |
 | **Customer** | Arif Mondal | `9000000003` | Levothyroxine (prescription re-upload on hold) |
 | **Pharmacist** | Anita Rao | `9000000099` | Verification queue, Schedule H1 approval, Generics |
-| **Store Staff** | Salt Lake Store | `9000000081` | Fulfillment, invoice generation, courier dispatch |
-| **Store Staff** | Behala Store | `9000000082` | Proves regulatory gate (dispatch blocked) |
-| **Store Staff** | Howrah Store | `9000000083` | Routed store fulfillment |
+| **Store Staff** | Salt Lake Store #81 | `9000000081` | Fulfillment, invoice generation, courier dispatch |
+| **Store Staff** | Behala Store Staff | `9000000082` | Proves regulatory gate (dispatch blocked) |
+| **Store Staff** | Howrah Store #83 | `9000000083` | Routed store fulfillment |
 
 ---
 

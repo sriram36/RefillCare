@@ -60,12 +60,40 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
             onClick={() => handleOneClickLogin('9000000001')}
             className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 bg-white hover:border-teal-600 hover:bg-teal-50/50 transition-all text-left shadow-2xs group"
           >
-            <div className="p-2 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+            <div className="p-2 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition-colors shrink-0">
               <User className="w-4 h-4" />
             </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900">Debasish Ghosh</div>
-              <div className="text-[10px] text-slate-500">Customer • Chronic Refills</div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-slate-900 truncate">Debasish Ghosh</div>
+              <div className="text-[10px] text-slate-500 truncate">Customer • Chronic Refills</div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleOneClickLogin('9000000002')}
+            className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 bg-white hover:border-teal-600 hover:bg-teal-50/50 transition-all text-left shadow-2xs group"
+          >
+            <div className="p-2 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition-colors shrink-0">
+              <User className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-slate-900 truncate">Rina Sen</div>
+              <div className="text-[10px] text-slate-500 truncate">Customer • Generic Consent</div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleOneClickLogin('9000000003')}
+            className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 bg-white hover:border-teal-600 hover:bg-teal-50/50 transition-all text-left shadow-2xs group"
+          >
+            <div className="p-2 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition-colors shrink-0">
+              <User className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-slate-900 truncate">Arif Mondal</div>
+              <div className="text-[10px] text-slate-500 truncate">Customer • On-Hold Reupload</div>
             </div>
           </button>
 
@@ -74,12 +102,12 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
             onClick={() => handleOneClickLogin('9000000099')}
             className="flex items-center gap-3 p-3 rounded-2xl border border-purple-200 bg-white hover:border-purple-600 hover:bg-purple-50/50 transition-all text-left shadow-2xs group"
           >
-            <div className="p-2 rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+            <div className="p-2 rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-colors shrink-0">
               <Shield className="w-4 h-4" />
             </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900">Anita Rao</div>
-              <div className="text-[10px] text-purple-700 font-semibold">Registered Pharmacist</div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-slate-900 truncate">Anita Rao</div>
+              <div className="text-[10px] text-purple-700 font-semibold truncate">Registered Pharmacist</div>
             </div>
           </button>
 
@@ -88,12 +116,26 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
             onClick={() => handleOneClickLogin('9000000081')}
             className="flex items-center gap-3 p-3 rounded-2xl border border-blue-200 bg-white hover:border-blue-600 hover:bg-blue-50/50 transition-all text-left shadow-2xs group"
           >
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0">
               <Store className="w-4 h-4" />
             </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900">Salt Lake Store #81</div>
-              <div className="text-[10px] text-blue-700 font-semibold">Store Fulfillment Staff</div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-slate-900 truncate">Salt Lake Store #81</div>
+              <div className="text-[10px] text-blue-700 font-semibold truncate">Store Fulfillment Staff</div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleOneClickLogin('9000000082')}
+            className="flex items-center gap-3 p-3 rounded-2xl border border-amber-200 bg-white hover:border-amber-600 hover:bg-amber-50/50 transition-all text-left shadow-2xs group"
+          >
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition-colors shrink-0">
+              <Store className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-slate-900 truncate">Behala Store Staff</div>
+              <div className="text-[10px] text-amber-700 font-semibold truncate">Store Staff • Gate Test</div>
             </div>
           </button>
 
@@ -102,12 +144,12 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
             onClick={() => handleOneClickLogin('9000000083')}
             className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 bg-white hover:border-teal-600 hover:bg-teal-50/50 transition-all text-left shadow-2xs group"
           >
-            <div className="p-2 rounded-xl bg-slate-50 text-slate-700 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+            <div className="p-2 rounded-xl bg-slate-50 text-slate-700 group-hover:bg-teal-600 group-hover:text-white transition-colors shrink-0">
               <Store className="w-4 h-4" />
             </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900">Howrah Store #83</div>
-              <div className="text-[10px] text-slate-500">Store Staff • Packing</div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-slate-900 truncate">Howrah Store #83</div>
+              <div className="text-[10px] text-slate-500 truncate">Store Staff • Packing</div>
             </div>
           </button>
         </div>
