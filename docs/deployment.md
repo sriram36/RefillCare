@@ -102,6 +102,7 @@ Open `http://localhost:8000/docs` to explore the OpenAPI documentation.
 4. **Environment Variables:**
    - `APP_SECRET`: `<generate a long random value; never commit it>`
    - `RX_ENC_KEY`: (optional, auto-generated from APP_SECRET if omitted)
+   - `DATABASE_URL`: `postgresql://user:pass@host:5432/dbname` (optional; when set, backend seamlessly runs on PostgreSQL via psycopg2 pool; when omitted, uses SQLite with WAL mode)
    - `AZURE_OPENAI_ENDPOINT`: `https://rag-42.openai.azure.com` (optional for live Azure Vision)
    - `AZURE_OPENAI_KEY`: `<your-azure-key>` (optional)
    - `AZURE_OPENAI_DEPLOYMENT`: `gpt-5.6-luna` (optional, defaults to `gpt-5.6-luna`)
@@ -155,9 +156,13 @@ Open `http://localhost:3000` in your browser.
 
 ---
 
-## 6. Pre-seeded Demo Logins
+## 6. Pre-seeded Demo Logins & General Sign-In
 
-All accounts feature dedicated 1-tap login buttons on the sign-in screen (Demo OTP: `123456`):
+The authentication interface provides two modes:
+1. **1-Tap Demo Roles:** Instant 1-tap sign-in buttons for all pre-seeded evaluation personas (Demo OTP: `123456`).
+2. **General Sign In / Register:** Reviewers or testers can enter any 10-digit mobile number (e.g. `9876543210`) with OTP `123456` and optional Name. Any non-seeded number automatically provisions a fresh customer account with isolated chronic order history and DPDP consent tracking.
+
+Additionally, a **Restart Demo Flow** button is available in the top header and on the sign-in modal, calling `POST /api/demo/reset` to restore orders and verification queues to initial demo state whenever needed.
 
 | Persona | 1-Tap Button Label | Phone | Primary Role / Action |
 |---|---|---|---|

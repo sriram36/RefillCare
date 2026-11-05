@@ -13,16 +13,29 @@ router = APIRouter(prefix="/api", tags=["Auth & User"])
 class LoginRequest(BaseModel):
     phone: str
     otp: str
+    name: str = ""
 
 
 @router.post("/login")
 def login(b: LoginRequest):
-    phone = b.phone.strip()
-    check_rate_limit(phone)
-    user = q("select * from users where phone = ?", phone, one=True)
-    if not user or b.otp != "123456":
-        record_failed_login(phone)
+    raw_phone = b.phone.strip()
+    digits = "".join(filter(str.isdigit, raw_phone))
+    check_phone = digits if len(digits) >= 10 else raw_phone
+    check_rate_limit(check_phone)
+
+    if b.otp != "123456" or len(digits) < 10:
+        record_failed_login(check_phone)
         raise HTTPException(401, "Wrong phone or OTP (demo OTP is 123456)")
+
+    phone = digits
+    user = q("select * from users where phone = ?", phone, one=True)
+    if not user:
+        user_name = b.name.strip()[:60] if b.name and b.name.strip() else f"User {phone[-4:]}"
+        ex("insert into users(name, phone, role) values(?, ?, 'customer')", user_name, phone)
+        user = q("select * from users where phone = ?", phone, one=True)
+        if user:
+            ex("insert into profiles(customer_id, name, relation) values(?, ?, 'Self')", user["id"], user_name)
+
     reset_failed_login(phone)
     token_ver = user.get("token_ver") or 1
     return {"token": tok(user["id"], token_ver), "user": user}
