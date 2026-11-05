@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Phone, KeyRound, ArrowRight, UserCheck, Shield, Store, User, Sparkles, Clock } from 'lucide-react';
+import { Phone, KeyRound, ArrowRight, UserCheck, Shield, Store, User, Sparkles, Clock, RotateCcw } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 import { postApi, setToken, setUser } from '../lib/api';
 
@@ -9,9 +9,10 @@ interface AuthModalProps {
   lang: Language;
   onLoginSuccess: (user: any) => void;
   onError: (msg: string) => void;
+  onResetDemo?: () => void;
 }
 
-export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalProps) {
+export default function AuthModal({ lang, onLoginSuccess, onError, onResetDemo }: AuthModalProps) {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -171,6 +172,24 @@ export default function AuthModal({ lang, onLoginSuccess, onError }: AuthModalPr
           <p className="text-xs text-teal-800 leading-relaxed max-w-sm mx-auto">
             Backend is hosted on Render free tier. If the server is waking up from sleep, cold start may take 30–45 seconds on first request. Please wait, authenticating now!
           </p>
+        </div>
+      )}
+
+      
+      {/* Restart Demo Flow Banner */}
+      {onResetDemo && (
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-50/70 border border-amber-200/90 shadow-2xs">
+          <div className="flex items-center gap-2 text-amber-950 font-semibold text-xs">
+            <RotateCcw className="w-4 h-4 text-amber-700 shrink-0" />
+            <span>Re-running the demo flow?</span>
+          </div>
+          <button
+            type="button"
+            onClick={onResetDemo}
+            className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl font-bold text-xs shadow-2xs transition active:scale-95"
+          >
+            Restart Demo Flow
+          </button>
         </div>
       )}
 

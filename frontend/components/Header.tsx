@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Pill, LogOut, Globe, Shield, Sparkles } from 'lucide-react';
+import { Pill, LogOut, Globe, Shield, Sparkles, RotateCcw } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 
 interface HeaderProps {
@@ -10,9 +10,10 @@ interface HeaderProps {
   lang: Language;
   onLangChange: (lang: Language) => void;
   onLogout: () => void;
+  onResetDemo?: () => void;
 }
 
-export default function Header({ user, lang, onLangChange, onLogout }: HeaderProps) {
+export default function Header({ user, lang, onLangChange, onLogout, onResetDemo }: HeaderProps) {
   const t = (k: string) => translate(k, lang);
 
   const getRoleBadge = (role: string) => {
@@ -69,7 +70,20 @@ export default function Header({ user, lang, onLangChange, onLogout }: HeaderPro
       </nav>
 
       {/* Right Actions: Language & User */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Restart Demo Flow Button */}
+        {onResetDemo && (
+          <button
+            onClick={onResetDemo}
+            className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50/80 hover:bg-amber-100 hover:border-amber-300 text-amber-900 px-2.5 py-1.5 text-xs font-bold transition-all active:scale-95 shadow-2xs"
+            title="Reset demo data to initial Step 1 state"
+          >
+            <RotateCcw className="h-3.5 w-3.5 text-amber-700 shrink-0" />
+            <span className="hidden sm:inline">Restart Demo Flow</span>
+            <span className="sm:hidden">Reset</span>
+          </button>
+        )}
+
         {/* Language Selector Pill */}
         <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300 transition-colors">
           <Globe className="h-3.5 w-3.5 text-teal-700" />

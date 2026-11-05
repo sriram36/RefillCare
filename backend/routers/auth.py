@@ -72,3 +72,8 @@ def export_my_data(u=Depends(auth)):
         "notes": my_notes,
         "prescriptions": my_prescriptions,
     }
+
+@router.post("/demo/reset")
+def reset_demo():
+    from database.seed import reset_demo_data
+    return reset_demo_data()

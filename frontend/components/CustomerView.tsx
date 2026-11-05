@@ -296,7 +296,7 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-300">
       
       {/* DPDP Consent Banner */}
       {!user.consent_at && (
@@ -363,17 +363,17 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
       })()}
 
       {/* Hero 1-Tap Reorder Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-800 via-teal-700 to-emerald-900 p-6 sm:p-8 text-white shadow-xl">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-800 via-teal-700 to-emerald-900 p-4 sm:p-5 text-white shadow-md">
         <div className="absolute -right-8 -bottom-8 w-56 h-56 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
         <div className="relative z-10 max-w-2xl space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur-md">
             <Sparkles className="w-3.5 h-3.5 text-teal-200" />
             Neighborhood Stores • Under 60-Minute Local Dispatch
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+          <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">
             Need Your Monthly Medicine Refill?
           </h2>
-          <p className="text-sm sm:text-base text-teal-100 leading-relaxed">
+          <p className="text-xs sm:text-sm text-teal-100 leading-relaxed">
             Upload your prescription photo or choose a chronic prescription. A licensed pharmacist will review, verify generic savings, and route to the nearest store.
           </p>
           <div className="pt-2 flex flex-wrap gap-3">
@@ -382,7 +382,7 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
                 const el = document.getElementById('up');
                 el?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="inline-flex items-center gap-2.5 rounded-xl bg-white px-6 py-3 text-sm font-bold text-teal-900 shadow-md transition hover:bg-teal-50 hover:shadow-lg active:scale-95"
+              className="inline-flex items-center gap-2.5 rounded-xl bg-white px-4 py-2 text-xs font-bold text-teal-900 shadow-md transition hover:bg-teal-50 hover:shadow-lg active:scale-95"
             >
               <Upload className="w-4 h-4 text-teal-700" />
               <span>Upload Prescription Photo</span>
@@ -393,7 +393,7 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
                 const el = document.getElementById('search-catalog');
                 el?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-teal-900/60 border border-teal-400/30 px-5 py-3 text-sm font-semibold text-white backdrop-blur-xs transition hover:bg-teal-900"
+              className="inline-flex items-center gap-2 rounded-xl bg-teal-900/60 border border-teal-400/30 px-4 py-2 text-xs font-semibold text-white backdrop-blur-xs transition hover:bg-teal-900"
             >
               <Search className="w-4 h-4" />
               <span>Search Drug Catalog</span>
@@ -432,7 +432,7 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
               return (
                 <div
                   key={r.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:shadow-md space-y-4"
+                  className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs transition hover:shadow-xs space-y-2.5"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -504,7 +504,7 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
       </div>
 
       {/* Prescription Upload Form */}
-      <div id="up" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-6">
+      <div id="up" className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -628,7 +628,7 @@ export default function CustomerView({ user, lang, onToast }: CustomerViewProps)
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               Prescription Photo File
             </label>
-            <div className="relative border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-teal-600 transition-colors bg-slate-50/50">
+            <div className="relative border-2 border-dashed border-slate-300 rounded-xl p-3.5 sm:p-4 text-center hover:border-teal-600 transition-colors bg-slate-50/50">
               <input
                 type="file"
                 accept="image/png,image/jpeg"

@@ -64,6 +64,16 @@ export default function Home() {
     showToast('Signed out successfully');
   };
 
+  const handleResetDemo = async () => {
+    try {
+      await postApi('demo/reset');
+      showToast('Demo data reset to clean initial Step 1 state!');
+      window.location.reload();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to reset demo');
+    }
+  };
+
   // Suppress SSR/hydration mismatch
   if (!mounted) {
     return (
@@ -79,7 +89,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-teal-100 selection:text-teal-900">
       {/* Sticky Header */}
-      <Header user={user} lang={lang} onLangChange={handleLangChange} onLogout={handleLogout} />
+      <Header user={user} lang={lang} onLangChange={handleLangChange} onLogout={handleLogout} onResetDemo={handleResetDemo} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
 
@@ -116,7 +126,7 @@ export default function Home() {
               </div>
             </div>
 
-            <AuthModal lang={lang} onLoginSuccess={handleLoginSuccess} onError={showToast} />
+            <AuthModal lang={lang} onLoginSuccess={handleLoginSuccess} onError={showToast} onResetDemo={handleResetDemo} />
           </div>
 
         ) : (

@@ -71,10 +71,10 @@ def init():
     days_ago = lambda n: (date.today() - timedelta(days=n)).isoformat()
 
     connection.executemany(
-        "insert into orders(code, customer_id, for_name, status, store_id, rx_file, note, created) values(?, ?, ?, ?, ?, ?, ?, ?)",
+        "insert into orders(code, customer_id, for_name, status, store_id, rx_file, note, created, area) values(?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
-            ("RX-50211", 1, "Mother", "packed", 1, None, "", now),
-            ("RX-50214", 2, "Rina Sen", "awaiting_pharmacist", 2, None, "", now),
+            ("RX-50211", 1, "Mother", "packed", 1, None, "", now, "Salt Lake"),
+            ("RX-50214", 2, "Rina Sen", "awaiting_pharmacist", 2, None, "", now, "Behala"),
             (
                 "RX-50219",
                 3,
@@ -84,6 +84,7 @@ def init():
                 None,
                 "Prescription not readable. Please upload a clearer photo.",
                 now,
+                "Howrah",
             ),
         ],
     )
@@ -137,3 +138,66 @@ def seed_images():
             with open(out_file, "wb") as enc_file:
                 enc_file.write(enc)
             ex("update orders set rx_file = ? where code = ?", f"{code}.enc", code)
+
+
+def reset_demo_data():
+    """Reset dynamic transaction state back to clean initial demo seed."""
+    ensure_schema()
+    now = int(time.time())
+    days_ago = lambda n: (date.today() - timedelta(days=n)).isoformat()
+
+    ex("delete from payment_orders")
+    ex("delete from transfers")
+    ex("delete from subscriptions")
+    ex("delete from prescriptions")
+    ex("delete from register")
+    ex("delete from audit")
+    ex("delete from refills")
+    ex("delete from items")
+    ex("delete from orders")
+
+    orders = [
+        ("RX-50211", 1, "Mother", "packed", 1, None, "", now, "Salt Lake"),
+        ("RX-50214", 2, "Rina Sen", "awaiting_pharmacist", 2, None, "", now, "Behala"),
+        ("RX-50219", 3, "Arif Mondal", "on_hold", 3, None, "Prescription not readable. Please upload a clearer photo.", now, "Howrah"),
+    ]
+    for o in orders:
+        ex(
+            "insert into orders(code, customer_id, for_name, status, store_id, rx_file, note, created, area) values(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            *o,
+        )
+
+    items = [
+        ("RX-50211", 1, MEDS[0][1], "H", 4, 120, 0.98, "approved", 9, ""),
+        ("RX-50214", 2, MEDS[1][1], "H", 3, 285, 0.90, "draft", None, ""),
+        ("RX-50219", 3, MEDS[2][1], "H", 1, 190, 0.40, "draft", None, ""),
+    ]
+    for itm in items:
+        ex(
+            "insert into items(order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            *itm,
+        )
+
+    refills = [
+        (1, "Mother", 1, 60, 2, days_ago(26)),
+        (2, "Rina Sen", 2, 30, 1, days_ago(25)),
+        (1, "Mother", 4, 45, 1, days_ago(10)),
+    ]
+    for rf in refills:
+        ex(
+            "insert into refills(customer_id, for_name, med_id, qty, per_day, last_filled) values(?, ?, ?, ?, ?, ?)",
+            *rf,
+        )
+
+    ex("update orders set created = ?, verified_at = ? where code = 'RX-50211'", now - 900, now - 300)
+    ex(
+        "insert into prescriptions(customer_id, profile_name, order_code, rx_file, approved_at, valid_until) values(?, ?, ?, ?, ?, ?)",
+        1,
+        "Mother",
+        "RX-50211",
+        "RX-50211.enc",
+        date.today().isoformat(),
+        (date.today() + timedelta(days=RX_VALID_DAYS)).isoformat(),
+    )
+    seed_images()
+    return {"status": "ok", "message": "Demo data reset successfully"}
