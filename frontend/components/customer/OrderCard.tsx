@@ -5,6 +5,7 @@ import { AlertTriangle, Camera, CreditCard, Tag } from 'lucide-react';
 import { Language, translate } from '../../lib/i18n';
 import { fetchApi, postApi } from '../../lib/api';
 import Timeline from '../Timeline';
+import PayModal from './PayModal';
 import { btnPrimary, btnSecondary, card, DEFAULT_NOTES, medName } from './ui';
 
 interface Props {
@@ -17,7 +18,7 @@ interface Props {
 export default function OrderCard({ order: o, lang, onToast, onChanged }: Props) {
   const t = (k: string, vars?: Record<string, string | number>) => translate(k, lang, vars);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [paying, setPaying] = useState(false);
+  const [showPay, setShowPay] = useState(false);
   const [sending, setSending] = useState(false);
 
   // One sentence a worried person can read at a glance
@@ -43,20 +44,10 @@ export default function OrderCard({ order: o, lang, onToast, onChanged }: Props)
   const canPay = o.paid !== 1 && o.payment !== 'upi_test' && !['rejected', 'on_hold'].includes(o.status);
   const showNote = o.status === 'on_hold' && o.note && !DEFAULT_NOTES.includes(o.note);
 
-  const payNow = async () => {
-    setPaying(true);
-    try {
-      // The server confirms the payment itself in test mode. The browser can no longer say "paid".
-      await postApi(`orders/${o.code}/pay`);
-      const res = await postApi(`orders/${o.code}/pay/confirm`);
-      onToast(t('paid_toast', { n: res.amount_rupees }));
-      onChanged();
-    } catch (err: any) {
-      onToast(err.message || t('try_again'));
-    } finally {
-      setPaying(false);
-    }
-  };
+  // what the customer would pay: every line that was not rejected
+  const amount = (o.items || [])
+    .filter((i: any) => i.status !== 'rejected')
+    .reduce((sum: number, i: any) => sum + i.price * i.qty, 0);
 
   const reupload = async (file?: File, sample?: string) => {
     setSending(true);
@@ -189,18 +180,32 @@ export default function OrderCard({ order: o, lang, onToast, onChanged }: Props)
 
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-base text-slate-600">
         <span>{o.paid === 1 || o.payment === 'upi_test' ? t('paid_lbl') : t('cod')}</span>
-        {canPay && (
+        {canPay && amount > 0 && (
           <button
             type="button"
-            onClick={payNow}
-            disabled={paying}
-            className="inline-flex h-12 items-center gap-2 rounded-xl border border-teal-700 px-4 text-base font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-60"
+            onClick={() => setShowPay(true)}
+            className="inline-flex h-12 items-center gap-2 rounded-xl border border-teal-700 px-4 text-base font-semibold text-teal-700 hover:bg-teal-50"
           >
             <CreditCard className="h-5 w-5" aria-hidden="true" />
-            {paying ? t('paying') : t('pay_online')}
+            {t('pay_online')}
           </button>
         )}
       </footer>
+
+      {showPay && (
+        <PayModal
+          lang={lang}
+          code={o.code}
+          amount={amount}
+          onClose={() => setShowPay(false)}
+          onError={onToast}
+          onPaid={(n) => {
+            setShowPay(false);
+            onToast(t('paid_toast', { n }));
+            onChanged();
+          }}
+        />
+      )}
     </article>
   );
 }
