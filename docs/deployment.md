@@ -177,7 +177,7 @@ The sign-in screen has a phone number and OTP form (OTP `123456`). Any new 10-di
 
 ## 7. Verification & Testing
 
-### Backend tests (64)
+### Backend tests (69)
 ```bash
 cd backend
 python -m pip install -r requirements.txt
@@ -185,7 +185,7 @@ python -m pytest tests -q
 ```
 Each test file starts from its own freshly seeded database. `tests/test_safety_gate.py` tries every way of creating an order (upload, refill, subscription, re-upload, cart, generic swap) and checks that none of them can be packed or dispatched without a pharmacist's approval, that Schedule X and narcotics are never sold, and that stock, payments and ownership cannot be bypassed.
 
-### End-to-end demo flow (29 checks)
+### End-to-end demo flow (30 checks)
 Needs Chrome (set `CHROME_PATH` if it is not in the usual place). Start the backend and the frontend, then:
 ```bash
 node e2e/demo_flow.js http://localhost:3000

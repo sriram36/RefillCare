@@ -21,6 +21,7 @@ Design rules: 17px base text, one primary action per screen, teal on white, larg
 2. **Pharmacist (`PharmacistView.tsx`):**
    - Queue sorted with what needs checking first and how long it has waited
    - The prescription image beside the matched items (AI draft), zoom, approve with quantity, reject with a reason, ask for a new photo
+   - Add a medicine from the catalogue when the AI missed or misread one (it still needs approval)
    - Schedule H1 register form; offer a cheaper generic (customer must agree)
    - Who opened the prescription (access log)
 3. **Store (`StoreView.tsx`):**
