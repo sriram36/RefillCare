@@ -3,31 +3,53 @@
 @tailwind utilities;
 
 :root {
-  --ink: #16242b;
-  --mute: #4b5b64;
-  --line: #d8e2e6;
-  --bg: #fafaf9;
+  --paper: #f5f1e6;
+  --ink: #1e2b25;
+  --fern: #2d6a4f;
 }
 
 html {
-  /* 17px base: customers are often worried, or ordering for a parent, and may be reading on a small phone */
-  font-size: 17px;
+  font-size: 16px;
 }
 
 body {
-  background-color: var(--bg);
+  background-color: var(--paper);
   color: var(--ink);
   min-height: 100vh;
   line-height: 1.6;
-  /* Bengali and Hindi fall back to Noto, which has the glyphs, instead of an unpredictable system font */
-  font-family: 'Plus Jakarta Sans', 'Noto Sans Bengali', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Figtree', 'Noto Sans Bengali', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Headings use the serif. Young Serif has one weight, so keep them regular. */
+h1,
+h2,
+h3 {
+  font-family: 'Young Serif', 'Noto Serif Bengali', 'Noto Serif Devanagari', Georgia, serif;
+  font-weight: 400 !important; /* one weight only: never let a utility class fake a bold */
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'lnum' 1;
+  letter-spacing: -0.005em;
+}
+
+/* Bengali and Devanagari need a little more room between lines */
+:lang(bn) body,
+:lang(hi) body {
+  line-height: 1.75;
+}
+
+/* Inputs stay 16px so phones do not zoom in when you tap them */
+input,
+select,
+textarea {
+  font-size: 16px;
 }
 
 /* A clear keyboard focus ring everywhere */
 :focus-visible {
-  outline: 3px solid #2a7c80;
+  outline: 3px solid #78ab86;
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 /* Never let a wide child push the page sideways on a phone */
