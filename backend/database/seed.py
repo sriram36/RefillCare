@@ -7,6 +7,7 @@ from core.config import BASE_DIR, DB, FKEY, STORE
 from database.session import db, ex, log, q, SCHEMA, ensure_schema
 from rules import RX_VALID_DAYS
 from services.catalog import CATALOG, GENERICS, MEDS
+from services.network import HISTORY_CUSTOMERS, STORES, build_history
 from services.ocr import demo_png
 
 
@@ -14,6 +15,7 @@ def init():
     actual_db = os.getenv("DB_PATH", DB)
     if os.path.exists(actual_db):
         ensure_schema()
+        sync_network()
         sync_catalog()
         return
 
@@ -40,14 +42,6 @@ def init():
             (1, "Mother", "Mother"),
             (2, "Rina Sen", "Self"),
             (3, "Arif Mondal", "Self"),
-        ],
-    )
-    connection.executemany(
-        "insert into stores values(?, ?, ?, ?)",
-        [
-            (1, "Salt Lake", 22.5867, 88.4171),
-            (2, "Behala", 22.4985, 88.3118),
-            (3, "Howrah Maidan", 22.5800, 88.3250),
         ],
     )
 
@@ -106,8 +100,58 @@ def init():
     connection.commit()
     connection.close()
     ensure_schema()
+    sync_network()
     sync_catalog()
+    seed_history()
     seed_images()
+
+
+def sync_network():
+    """Make sure every store in the sample network exists. Adds missing stores only, never edits one."""
+    connection = db()
+    try:
+        connection.executemany("insert or ignore into stores values(?, ?, ?, ?)", STORES)
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def seed_history():
+    """Past orders and the customers who placed them, so the dashboard has a real picture to show.
+
+    Only for a fresh or reset demo database. Re-running it replaces its own rows and leaves everything else alone."""
+    now = int(time.time())
+    history = build_history(now)
+    connection = db()
+    try:
+        for cid, name, phone, lang in HISTORY_CUSTOMERS:
+            connection.execute(
+                "insert or ignore into users(id, name, phone, role, consent_at, lang) values(?, ?, ?, 'customer', ?, ?)",
+                (cid, name, phone, now, lang),
+            )
+        for cid, name, relation in history["profiles"]:
+            if not connection.execute("select 1 from profiles where customer_id = ? and name = ?", (cid, name)).fetchone():
+                connection.execute("insert into profiles(customer_id, name, relation) values(?, ?, ?)", (cid, name, relation))
+        connection.executemany(
+            "insert into orders(code, customer_id, for_name, status, store_id, rx_file, note, created, verified_at, invoice_no, "
+            "payment, paid, area, payment_ref, delivery_partner) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            history["orders"],
+        )
+        connection.executemany(
+            "insert into items(order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason) "
+            "values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            history["items"],
+        )
+        for code, med_id, prescriber, patient, qty, ts in history["register"]:
+            item = connection.execute("select id from items where order_code = ? and med_id = ?", (code, med_id)).fetchone()
+            connection.execute("insert into register values(?, ?, ?, ?, ?, ?)", (code, item["id"], prescriber, patient, qty, ts))
+        connection.executemany(
+            "insert into refills(customer_id, for_name, med_id, qty, per_day, last_filled) values(?, ?, ?, ?, ?, ?)",
+            history["refills"],
+        )
+        connection.commit()
+    finally:
+        connection.close()
 
 
 def sync_catalog():
@@ -164,6 +208,7 @@ def seed_images():
 def reset_demo_data():
     """Reset dynamic transaction state back to clean initial demo seed."""
     ensure_schema()
+    sync_network()
     sync_catalog()
     now = int(time.time())
     days_ago = lambda n: (date.today() - timedelta(days=n)).isoformat()
@@ -234,6 +279,7 @@ def reset_demo_data():
         date.today().isoformat(),
         (date.today() + timedelta(days=RX_VALID_DAYS)).isoformat(),
     )
+    seed_history()
     seed_images()
     log("demo", "demo_reset", "all")
     return {"status": "ok", "message": "Demo data reset successfully"}
