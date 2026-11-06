@@ -49,3 +49,6 @@ AZURE_DEPLOY = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-5.6-luna")
 
 # Allowed CORS origins (comma-separated list, e.g. "http://localhost:3000,https://my-app.vercel.app")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+
+# Refill reminders go out by themselves once a day, from this hour (India time). Set -1 to turn the timer off.
+REMINDER_HOUR = int(os.getenv("REMINDER_HOUR", "9"))

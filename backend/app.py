@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -5,6 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import core.config as cfg
 from core.config import CORS_ORIGINS
 from database.seed import init, seed_images
+from services.reminders import scheduler
 
 # Routers
 from routers.auth import router as auth_router
@@ -16,8 +20,18 @@ from routers.profiles import router as profiles_router
 from routers.dashboard import router as dashboard_router
 from routers.subscriptions import router as subscriptions_router
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Refill reminders go out once a day by themselves (REMINDER_HOUR, India time; -1 turns this off)."""
+    task = asyncio.create_task(scheduler()) if cfg.REMINDER_HOUR >= 0 else None
+    yield
+    if task:
+        task.cancel()
+
+
 # Create FastAPI application
 app = FastAPI(
+    lifespan=lifespan,
     title="RefillCare API",
     description="Pharmacy reordering, pharmacist verification, and stock routing platform.",
     version="1.0.0",

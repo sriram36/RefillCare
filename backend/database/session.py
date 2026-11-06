@@ -21,6 +21,7 @@ create table register(order_code, item_id, prescriber, patient, qty, ts);
 create table prescriptions(id integer primary key, customer_id, profile_name, order_code, rx_file, approved_at, valid_until);
 create table subscriptions(id integer primary key, customer_id, for_name, med_id, qty, per_day, frequency_days default 30, next_refill, active default 1, created integer);
 create table transfers(id integer primary key, from_store_id integer, to_store_id integer, med_id integer, qty integer, status text default 'requested', requested_at integer, fulfilled_at integer);
+create table outbox(id integer primary key, ts integer, customer_id integer, phone text, channel text, text text);
 """
 
 _PG_ACTIVE = False
@@ -141,6 +142,10 @@ def ensure_schema():
     )
     connection.execute(
         "create table if not exists transfers(id integer primary key, from_store_id integer, to_store_id integer, med_id integer, qty integer, status text default 'requested', requested_at integer, fulfilled_at integer)"
+    )
+
+    connection.execute(
+        "create table if not exists outbox(id integer primary key, ts integer, customer_id integer, phone text, channel text, text text)"
     )
 
     for col, ddl in [
