@@ -1,11 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  BarChart3, Store, Clock, AlertTriangle, ShieldCheck, 
-  Upload, BellRing, RefreshCw, CheckCircle2, TrendingUp, ArrowLeft
-} from 'lucide-react';
-import { Language, translate } from '../lib/i18n';
+import { AlertTriangle, ArrowLeft, Bell, RefreshCw, Upload } from 'lucide-react';
+import { Language } from '../lib/i18n';
 import { fetchApi, postApi, buildApiUrl, getToken } from '../lib/api';
 
 interface DashboardViewProps {
@@ -15,22 +12,37 @@ interface DashboardViewProps {
   onBackToQueue?: () => void;
 }
 
-export default function DashboardView({ user, lang, onToast, onBackToQueue }: DashboardViewProps) {
+const card = 'rounded-2xl border border-slate-200 bg-white p-5 sm:p-6';
+const btnPrimary = 'inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 text-base font-semibold text-white hover:bg-teal-800 disabled:opacity-60';
+const btnSecondary = 'inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-base font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-60';
+
+function Stat({ label, value, unit, note, tone }: { label: string; value: React.ReactNode; unit?: string; note?: string; tone?: 'ok' | 'warn' }) {
+  return (
+    <div className={card}>
+      <p className="text-base font-semibold text-slate-600">{label}</p>
+      <p className="mt-2 flex items-baseline gap-2">
+        <span className="text-4xl font-bold text-slate-900">{value}</span>
+        {unit && <span className="text-base text-slate-600">{unit}</span>}
+      </p>
+      {note && (
+        <p className={`mt-2 text-base font-medium ${tone === 'warn' ? 'text-rose-700' : tone === 'ok' ? 'text-teal-800' : 'text-slate-600'}`}>{note}</p>
+      )}
+    </div>
+  );
+}
+
+export default function DashboardView({ onToast, onBackToQueue }: DashboardViewProps) {
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [stockFile, setStockFile] = useState<File | null>(null);
   const [uploadingStock, setUploadingStock] = useState(false);
   const [runningReminders, setRunningReminders] = useState(false);
 
-  const t = (k: string) => translate(k, lang);
-
   const loadDashboard = async () => {
     try {
-      setLoading(true);
-      const res = await fetchApi('dashboard');
-      setData(res);
+      setData(await fetchApi('dashboard'));
     } catch (err: any) {
-      onToast(err.message || 'Failed to load executive dashboard');
+      onToast(err.message || 'Could not load the dashboard.');
     } finally {
       setLoading(false);
     }
@@ -43,32 +55,26 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
   const handleStockUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stockFile) {
-      onToast('Please select a stock CSV file');
+      onToast('Choose a stock CSV first.');
       return;
     }
-
     try {
       setUploadingStock(true);
       const formData = new FormData();
       formData.append('file', stockFile);
-
       const token = getToken();
       const res = await fetch(buildApiUrl('stock'), {
         method: 'POST',
         headers: token ? { Authorization: token } : {},
         body: formData,
       });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'Failed to upload stock CSV');
-      }
-
-      onToast('Daily stock CSV processed successfully');
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.detail || 'The stock file was not accepted.');
+      onToast(`Stock updated: ${body.rows} rows.`);
       setStockFile(null);
       await loadDashboard();
     } catch (err: any) {
-      onToast(err.message || 'Stock upload failed');
+      onToast(err.message || 'The stock file was not accepted.');
     } finally {
       setUploadingStock(false);
     }
@@ -78,10 +84,10 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
     try {
       setRunningReminders(true);
       const res = await postApi('reminders/run');
-      onToast(res.message || 'Refill reminders triggered successfully');
+      onToast(res.sent === 0 ? 'No new reminders today.' : `${res.sent} reminder${res.sent === 1 ? '' : 's'} sent.`);
       await loadDashboard();
     } catch (err: any) {
-      onToast(err.message || 'Failed to trigger refill reminders');
+      onToast(err.message || 'Could not send reminders.');
     } finally {
       setRunningReminders(false);
     }
@@ -89,359 +95,245 @@ export default function DashboardView({ user, lang, onToast, onBackToQueue }: Da
 
   if (loading && !data) {
     return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-20 bg-slate-100 rounded-xl" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-28 bg-slate-100 rounded-xl" />
-          ))}
-        </div>
-        <div className="h-48 bg-slate-100 rounded-xl" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-40 bg-slate-100 rounded-xl" />
-          <div className="h-40 bg-slate-100 rounded-xl" />
-        </div>
-        <div className="flex items-center justify-center gap-2 pt-2 text-slate-400 text-xs">
-          <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-          Loading Central Operations Dashboard…
-        </div>
-        <div className="text-[11px] text-slate-400 text-center">
-          (Render backend cold-start may take up to 45s on first wake-up)
-        </div>
-      </div>
+      <p className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-lg text-slate-600" role="status">
+        Loading the dashboard…
+      </p>
     );
   }
 
-  const overview = data?.network_overview || {
-    total_stores: 3,
-    active_orders: 0,
-    total_orders: 0,
-  };
-
-  const medianTime = data?.median_verify_min ?? '4.2';
-  const storesSummary = data?.stores_summary || [];
-  const lowStockAlerts = data?.low_stock_alerts || [];
-  const register = data?.register || [];
-  const audit = data?.audit || [];
+  const overview = data?.network_overview || { total_stores: 0, active_orders: 0, total_orders: 0 };
+  const target = data?.verify_target_min ?? 10;
+  const median: number | null = data?.median_verify_min ?? null;
+  const storesSummary: any[] = data?.stores_summary || [];
+  const lowStock: any[] = data?.low_stock_alerts || [];
+  const register: any[] = data?.register || [];
+  const audit: any[] = data?.audit || [];
+  const rejections: [string, number][] = Object.entries(data?.rejections || {}).sort((a: any, b: any) => b[1] - a[1]) as any;
+  const totalRejected = rejections.reduce((s, [, n]) => s + n, 0);
+  const notRouted = data?.by_store?.['Not routed'] || 0;
+  const breaches = data?.unapproved_dispatches ?? 0;
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2">
-            {onBackToQueue && (
-              <button
-                onClick={onBackToQueue}
-                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors mr-1"
-                title="Back to Pharmacist Queue"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-            )}
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <BarChart3 className="w-6 h-6 text-teal-700" />
-              Central Operations Dashboard
-            </h1>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          {onBackToQueue && (
+            <button onClick={onBackToQueue} className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" aria-label="Back to the queue">
+              <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">All stores</h1>
+            <p className="text-base text-slate-600">Orders, verification time and rejections across the network.</p>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Real-time fulfillment metrics across all stores in Kolkata & Howrah • Managing Director View
-          </p>
         </div>
-
-        <button
-          onClick={loadDashboard}
-          className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors self-start sm:self-auto"
-          title="Refresh Data"
-        >
-          <RefreshCw className="w-5 h-5" />
+        <button onClick={loadDashboard} className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" aria-label="Refresh">
+          <RefreshCw className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
 
-      {/* High-Level KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Verification SLA */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Median Verification</span>
-            <Clock className="w-5 h-5 text-teal-700" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-slate-900">{medianTime}</span>
-            <span className="text-xs font-medium text-slate-500">minutes</span>
-          </div>
-          <div className="mt-2 text-xs text-emerald-700 font-medium flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Within 10-minute SLA target
-          </div>
-        </div>
-
-        {/* Network Total Stores */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Store Network</span>
-            <Store className="w-5 h-5 text-teal-700" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-slate-900">{overview.total_stores || 3}</span>
-            <span className="text-xs font-medium text-slate-500">Kolkata & Howrah</span>
-          </div>
-          <div className="mt-2 text-xs text-slate-500">
-            1 central warehouse connected
-          </div>
-        </div>
-
-        {/* Active Orders */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active In-Flight</span>
-            <TrendingUp className="w-5 h-5 text-amber-600" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-slate-900">{overview.active_orders}</span>
-            <span className="text-xs font-medium text-slate-500">orders</span>
-          </div>
-          <div className="mt-2 text-xs text-amber-700 font-medium">
-            Verification & store fulfillment
-          </div>
-        </div>
-
-        {/* Total Orders Completed */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Volume</span>
-            <CheckCircle2 className="w-5 h-5 text-teal-700" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-slate-900">{overview.total_orders}</span>
-            <span className="text-xs font-medium text-slate-500">orders processed</span>
-          </div>
-          <div className="mt-2 text-xs text-slate-500">
-            Zero Schedule H dispatch breaches
-          </div>
-        </div>
-
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat
+          label="Median verification"
+          value={median === null ? '—' : median}
+          unit={median === null ? undefined : 'min'}
+          note={median === null ? 'No verified orders yet' : median < target ? `Under the ${target}-minute target` : `Over the ${target}-minute target`}
+          tone={median === null ? undefined : median < target ? 'ok' : 'warn'}
+        />
+        <Stat label="Waiting for a pharmacist" value={data?.awaiting_now ?? 0} unit="orders" />
+        <Stat label="Orders in progress" value={overview.active_orders} unit={`of ${overview.total_orders}`} />
+        <Stat
+          label="Sent without approval"
+          value={breaches}
+          note={breaches === 0 ? 'None. Every packed item was approved.' : 'Investigate now.'}
+          tone={breaches === 0 ? 'ok' : 'warn'}
+        />
       </div>
 
-      {/* Network Stores Summary Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Store className="w-4 h-4 text-teal-700" />
-            Network Fulfillment & Inventory Summary
-          </h2>
-          <span className="text-xs text-slate-400">Live Status</span>
-        </div>
-
+      <section className={`${card} space-y-4`} aria-labelledby="stores-h">
+        <h2 id="stores-h" className="text-xl font-bold text-slate-900">
+          Orders by store
+        </h2>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-              <tr>
-                <th className="py-3 px-4">Store Name</th>
-                <th className="py-3 px-4 text-center">Total Orders</th>
-                <th className="py-3 px-4 text-center">Awaiting Verification</th>
-                <th className="py-3 px-4 text-center">Approved</th>
-                <th className="py-3 px-4 text-center">Packed</th>
-                <th className="py-3 px-4 text-center">Dispatched</th>
-                <th className="py-3 px-4 text-right">Inventory Health</th>
+          <table className="w-full min-w-[34rem] text-left text-base">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-600">
+                <th className="py-3 pr-4 font-semibold">Store</th>
+                <th className="px-3 py-3 text-center font-semibold">Orders</th>
+                <th className="px-3 py-3 text-center font-semibold">Checking</th>
+                <th className="px-3 py-3 text-center font-semibold">Approved</th>
+                <th className="px-3 py-3 text-center font-semibold">Packed</th>
+                <th className="px-3 py-3 text-center font-semibold">Handed over</th>
+                <th className="py-3 pl-3 text-right font-semibold">Stock</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {storesSummary.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-6 text-center text-slate-400">
-                    No store data recorded yet.
+            <tbody className="divide-y divide-slate-100 text-slate-800">
+              {storesSummary.map((s: any) => (
+                <tr key={s.id}>
+                  <th scope="row" className="py-3 pr-4 font-semibold text-slate-900">
+                    {s.name}
+                  </th>
+                  <td className="px-3 py-3 text-center">{s.total_orders}</td>
+                  <td className="px-3 py-3 text-center">{s.awaiting}</td>
+                  <td className="px-3 py-3 text-center">{s.approved}</td>
+                  <td className="px-3 py-3 text-center">{s.packed}</td>
+                  <td className="px-3 py-3 text-center">{s.dispatched}</td>
+                  <td className="py-3 pl-3 text-right">
+                    {s.low_stock_count > 0 ? (
+                      <span className="inline-flex items-center gap-1 font-semibold text-rose-700">
+                        <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                        {s.low_stock_count} low
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">OK</span>
+                    )}
                   </td>
                 </tr>
-              ) : (
-                storesSummary.map((store: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-4 font-semibold text-slate-900">{store.name}</td>
-                    <td className="py-3 px-4 text-center font-medium">{store.total_orders}</td>
-                    <td className="py-3 px-4 text-center text-amber-700 font-medium">{store.awaiting}</td>
-                    <td className="py-3 px-4 text-center text-teal-800 font-medium">{store.approved}</td>
-                    <td className="py-3 px-4 text-center text-blue-700 font-medium">{store.packed}</td>
-                    <td className="py-3 px-4 text-center text-emerald-700 font-medium">{store.dispatched}</td>
-                    <td className="py-3 px-4 text-right">
-                      {store.low_stock_count > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-800">
-                          <AlertTriangle className="w-3 h-3" />
-                          {store.low_stock_count} low items
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800">
-                          ✓ Healthy
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+              ))}
+              {notRouted > 0 && (
+                <tr>
+                  <th scope="row" className="py-3 pr-4 font-semibold text-slate-700">
+                    Not routed yet
+                  </th>
+                  <td className="px-3 py-3 text-center">{notRouted}</td>
+                  <td colSpan={5} className="py-3 pl-3 text-slate-600">
+                    Still being checked, or no single store has every item.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      {/* Grid: Low Stock Alerts & Schedule H1 Register */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Low Stock Inventory Alerts */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-600" />
-              Low Stock Alerts (&le; 5 units)
-            </h2>
-            <span className="text-xs text-slate-400">Automated Routing Impact</span>
-          </div>
-
-          {lowStockAlerts.length === 0 ? (
-            <div className="text-xs text-slate-400 py-6 text-center">
-              All store inventory levels are currently above reorder thresholds.
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              {lowStockAlerts.map((item: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2.5 rounded-lg border border-red-100 bg-red-50/50 text-xs"
-                >
-                  <div>
-                    <strong className="text-slate-900">{item.med_name}</strong>
-                    <div className="text-slate-500 text-[11px] mt-0.5">
-                      Store: {item.store_name}
-                    </div>
-                  </div>
-                  <span className="px-2 py-1 rounded bg-red-200 text-red-900 font-bold text-xs">
-                    {item.qty} units left
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Schedule H1 Regulatory Register */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-purple-700" />
-              Schedule H1 Compliance Register
-            </h2>
-            <span className="text-xs text-purple-700 font-semibold bg-purple-50 px-2 py-0.5 rounded">
-              Drugs & Cosmetics Act
-            </span>
-          </div>
-
-          {register.length === 0 ? (
-            <div className="text-xs text-slate-400 py-6 text-center">
-              No Schedule H1 medicines dispensed yet.
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              {register.map((reg: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="p-2.5 rounded-lg border border-purple-100 bg-purple-50/40 text-xs space-y-1"
-                >
-                  <div className="flex items-center justify-between">
-                    <strong className="text-purple-950 font-bold">{reg.order_code}</strong>
-                    <span className="text-[11px] text-purple-800 font-semibold">Qty: {reg.qty}</span>
-                  </div>
-                  <div className="text-slate-600 text-[11px]">
-                    Prescriber: <span className="font-semibold text-slate-800">{reg.prescriber}</span>
-                  </div>
-                  <div className="text-slate-600 text-[11px]">
-                    Patient: <span className="font-semibold text-slate-800">{reg.patient}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-      </div>
-
-      {/* Operational Actions: Daily Stock CSV & Reminders Trigger */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Daily Stock CSV Upload */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
-          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Upload className="w-4 h-4 text-teal-700" />
-            Upload Daily Stock CSV
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className={`${card} space-y-4`} aria-labelledby="rej-h">
+          <h2 id="rej-h" className="text-xl font-bold text-slate-900">
+            Rejections {totalRejected > 0 && <span className="text-slate-500">({totalRejected})</span>}
           </h2>
-          <p className="text-xs text-slate-500">
-            Sync daily inventory levels across all stores and the central warehouse for accurate routing.
-          </p>
-          <form onSubmit={handleStockUpload} className="space-y-3 pt-1">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(e) => setStockFile(e.target.files?.[0] || null)}
-              className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-800 hover:file:bg-teal-100 cursor-pointer"
-            />
-            <button
-              type="submit"
-              disabled={uploadingStock || !stockFile}
-              className="w-full py-2 bg-teal-800 hover:bg-teal-900 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5"
-            >
-              {uploadingStock ? 'Uploading & Syncing...' : 'Upload & Route Stock CSV'}
-            </button>
-          </form>
-        </div>
+          {rejections.length === 0 ? (
+            <p className="text-base text-slate-600">No medicines rejected yet.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {rejections.map(([reason, n]) => (
+                <li key={reason} className="flex items-baseline justify-between gap-3 py-3 text-base">
+                  <span className="text-slate-900">{reason}</span>
+                  <span className="shrink-0 font-bold text-slate-900">{n}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-        {/* Refill Reminders Trigger */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3 flex flex-col justify-between">
-          <div>
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <BellRing className="w-4 h-4 text-teal-700" />
-              Automated Refill Reminders Engine
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Computes days of supply remaining for 9,000+ regular chronic patients (diabetes, blood pressure, thyroid). Sends WhatsApp / SMS alerts before medicines run out.
+        <section className={`${card} space-y-4`} aria-labelledby="low-h">
+          <h2 id="low-h" className="text-xl font-bold text-slate-900">
+            Low stock (5 or fewer)
+          </h2>
+          {lowStock.length === 0 ? (
+            <p className="text-base text-slate-600">Every store is above the limit.</p>
+          ) : (
+            <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
+              {lowStock.map((item: any, idx: number) => (
+                <li key={idx} className="flex items-baseline justify-between gap-3 py-3 text-base">
+                  <span>
+                    <strong className="text-slate-900">{(item.med_name || '').split(',')[0]}</strong>
+                    <span className="block text-slate-600">{item.store_name}</span>
+                  </span>
+                  <span className="shrink-0 font-bold text-rose-700">{item.qty} left</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      <section className={`${card} space-y-4`} aria-labelledby="h1-h">
+        <h2 id="h1-h" className="text-xl font-bold text-slate-900">
+          Schedule H1 register
+        </h2>
+        {register.length === 0 ? (
+          <p className="text-base text-slate-600">No Schedule H1 medicines sold yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[28rem] text-left text-base">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-600">
+                  <th className="py-3 pr-4 font-semibold">Order</th>
+                  <th className="px-3 py-3 font-semibold">Prescriber</th>
+                  <th className="px-3 py-3 font-semibold">Patient</th>
+                  <th className="py-3 pl-3 text-right font-semibold">Packs</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {register.map((reg: any, idx: number) => (
+                  <tr key={idx}>
+                    <td className="py-3 pr-4 font-semibold text-slate-900">{reg.order_code}</td>
+                    <td className="px-3 py-3">{reg.prescriber}</td>
+                    <td className="px-3 py-3">{reg.patient}</td>
+                    <td className="py-3 pl-3 text-right">{reg.qty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <form onSubmit={handleStockUpload} className={`${card} space-y-4`} aria-labelledby="stock-h">
+          <h2 id="stock-h" className="text-xl font-bold text-slate-900">
+            Daily stock file
+          </h2>
+          <p className="text-base text-slate-600">
+            A CSV with the columns <code className="rounded bg-stone-100 px-1.5 py-0.5">store_id,med_id,qty</code>. Orders are routed from these counts.
+          </p>
+          <input
+            type="file"
+            accept=".csv"
+            aria-label="Stock CSV file"
+            onChange={(e) => setStockFile(e.target.files?.[0] || null)}
+            className="block w-full text-base text-slate-700 file:mr-3 file:h-11 file:rounded-xl file:border file:border-slate-300 file:bg-white file:px-4 file:text-base file:font-semibold file:text-slate-900"
+          />
+          <button type="submit" disabled={uploadingStock || !stockFile} className={btnPrimary}>
+            <Upload className="h-5 w-5" aria-hidden="true" />
+            {uploadingStock ? 'Uploading…' : 'Upload stock'}
+          </button>
+        </form>
+
+        <div className={`${card} flex flex-col justify-between gap-4`}>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-slate-900">Refill reminders</h2>
+            <p className="text-base text-slate-600">
+              Messages customers whose medicine runs out within 5 days, in their own language. Each person gets one a day.
             </p>
           </div>
-
-          <button
-            onClick={handleRunReminders}
-            disabled={runningReminders}
-            className="w-full py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5"
-          >
-            <BellRing className="w-4 h-4" />
-            {runningReminders ? 'Processing...' : "Run Today's Refill Reminders"}
+          <button onClick={handleRunReminders} disabled={runningReminders} className={btnSecondary}>
+            <Bell className="h-5 w-5" aria-hidden="true" />
+            {runningReminders ? 'Sending…' : 'Send today’s reminders'}
           </button>
         </div>
-
       </div>
 
-      {/* Central Operations Audit Trail */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
-        <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-          <Clock className="w-4 h-4 text-slate-500" />
-          Recent Central Operations Audit Activity
+      <section className={`${card} space-y-3`} aria-labelledby="audit-h">
+        <h2 id="audit-h" className="text-xl font-bold text-slate-900">
+          Recent activity
         </h2>
-        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-          {audit.length === 0 ? (
-            <div className="text-xs text-slate-400 py-3 text-center">No recent audit logs recorded.</div>
-          ) : (
-            audit.map((entry: any, idx: number) => (
-              <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-slate-50 last:border-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-slate-400 text-[11px]">
-                    {new Date(entry.ts * 1000).toLocaleTimeString()}
-                  </span>
-                  <strong className="text-slate-800">{entry.actor}</strong>
-                  <span className="text-slate-500">{entry.action}</span>
-                </div>
-                <span className="font-medium text-teal-800 text-[11px]">{entry.entity}</span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
+        {audit.length === 0 ? (
+          <p className="text-base text-slate-600">Nothing recorded yet.</p>
+        ) : (
+          <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
+            {audit.map((entry: any, idx: number) => (
+              <li key={idx} className="flex flex-wrap items-baseline justify-between gap-x-3 py-2.5 text-base">
+                <span>
+                  <span className="text-slate-500">{new Date(entry.ts * 1000).toLocaleTimeString()}</span>{' '}
+                  <strong className="text-slate-900">{entry.actor}</strong> <span className="text-slate-700">{entry.action}</span>
+                </span>
+                <span className="text-slate-600">{entry.entity}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
