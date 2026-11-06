@@ -331,6 +331,14 @@ async function main() {
       await shot(rina, '08_generic_offer');
       await clickText(rina, 'Accept', { exact: true });
       await waitText(rina, 'You saved ₹285');
+      await noText(rina, 'Reorder now'); // her order is still open, even though it now holds the generic
+    });
+    await step('Rina pays through the dummy UPI screen (nothing real happens)', async () => {
+      await clickText(rina, 'Pay with UPI (demo)', { exact: true });
+      await waitText(rina, 'This is a demo. No real money moves.');
+      await shot(rina, '08b_demo_payment');
+      await clickText(rina, 'Pay ₹', { selector: 'button' });
+      await waitText(rina, 'received (demo)');
     });
 
     console.log('\n7. The store packs and hands over, now that it is approved');
