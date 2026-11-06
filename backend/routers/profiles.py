@@ -22,16 +22,30 @@ class Profile(BaseModel):
 
 
 @router.get("/search")
-def search(term: str = "", u=Depends(auth)):
+def search(term: str = "", category: str = "", u=Depends(auth)):
+    """Find medicines by name or group. Each result says how many stores have it in stock."""
     need(u, "customer")
     term_clean = term.strip()[:40]
-    if len(term_clean) < 2:
+    category_clean = category.strip()[:40]
+    # a name needs two letters; a group on its own is enough to browse
+    if len(term_clean) < 2 and not category_clean:
         return []
 
-    rows = q(
-        "select id, name, schedule, price from meds where generic_of is null and name like ? limit 10",
-        f"%{term_clean}%",
+    sql = (
+        "select m.id, m.name, m.schedule, m.price, m.category, "
+        "(select count(*) from stock s where s.med_id = m.id and s.qty > 0) as stores_in_stock "
+        "from meds m where m.generic_of is null"
     )
+    args: list = []
+    if category_clean:
+        sql += " and m.category = ?"
+        args.append(category_clean)
+    if len(term_clean) >= 2:
+        sql += " and (m.name like ? or m.category like ?)"
+        args += [f"%{term_clean}%", f"%{term_clean}%"]
+    sql += " order by m.name limit 30"
+
+    rows = q(sql, *args)
     for m in rows:
         m_rule = rule(m["schedule"])
         if m_rule["blocked"]:
