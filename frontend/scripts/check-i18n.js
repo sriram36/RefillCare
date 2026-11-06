@@ -69,7 +69,7 @@ for (const f of files) {
     ...[...text.matchAll(/\bGROUP_KEY\b[^\n]*'(cat_restricted)'/g)].map((m) => m[1]),
     ...[...text.matchAll(/\[\s*'\w+',\s*'(sample_\w+)'\s*\]/g)].map((m) => m[1]),
     // staff screens keep their keys in lookup tables such as STATUS_KEY = { dispatched: 'ph_status_dispatched' }
-    ...[...text.matchAll(/['"]((?:ph|st|db)_\w+)['"]/g)].map((m) => m[1]),
+    ...[...text.matchAll(/['"]((?:ph|sv|db)_\w+)['"]/g)].map((m) => m[1]),
   ]);
   for (const k of used) if (!(k in dict.en)) problems.push(`${f}: uses "${k}", which is not defined`);
 }

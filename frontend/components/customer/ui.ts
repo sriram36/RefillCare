@@ -24,6 +24,15 @@ export const choice = (selected: boolean) =>
       : 'border-stone-300 bg-white text-slate-800 hover:bg-stone-50'
   }`;
 
+const LOCALES: Record<string, string> = { en: 'en-IN', bn: 'bn-IN', hi: 'hi-IN' };
+
+/** A real date, such as 'Sun, 10 Nov', for a day count: the day somebody can act on beats "in 4 days". */
+export const dayLabel = (daysFromToday: number, lang: string) => {
+  const d = new Date();
+  d.setDate(d.getDate() + Math.max(daysFromToday, 0));
+  return d.toLocaleDateString(LOCALES[lang] || 'en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+};
+
 /** Medicine names print as 'Metformin 500 mg, strip of 15'. The pack detail is shown on its own. */
 export const medName = (full: string) => (full || '').split(',')[0];
 export const medPack = (full: string) => (full || '').split(',').slice(1).join(',').trim();

@@ -9,7 +9,7 @@ import MedicineSearch from './customer/MedicineSearch';
 import OrderCard from './customer/OrderCard';
 import PillStrip from './customer/PillStrip';
 import PrescriptionForm from './customer/PrescriptionForm';
-import { btnPrimary, btnQuiet, btnSecondary, medName, medPack } from './customer/ui';
+import { btnPrimary, btnQuiet, btnSecondary, dayLabel, medName, medPack } from './customer/ui';
 
 interface CustomerViewProps {
   user: any;
@@ -68,6 +68,7 @@ export default function CustomerView({ user, lang, onToast, onErased }: Customer
     // keep order status fresh without the customer having to refresh
     const timer = setInterval(() => {
       fetchApi('orders').then(setOrders).catch(() => {});
+      fetchApi('notes').then((n) => setNotes(n || [])).catch(() => {}); // a reminder or order update appears without a reload
     }, 10000);
     return () => clearInterval(timer);
   }, [load]);
@@ -209,7 +210,9 @@ export default function CustomerView({ user, lang, onToast, onErased }: Customer
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl text-slate-900">{t('hello', { name: user.name.split(' ')[0] })}</h1>
-        <p className="mt-1 text-base text-slate-600">{t('hello_sub')}</p>
+        <p className="mt-1 text-base text-slate-600">
+          {dayLabel(0, lang)} · {t('hello_sub')}
+        </p>
       </div>
 
       {!user.consent_at && (
@@ -254,6 +257,7 @@ export default function CustomerView({ user, lang, onToast, onErased }: Customer
                           {medPack(r.name) ? ' · ' : ''}
                           {t('refill_for', { name: r.for_name, n: r.per_day })}
                         </p>
+                        <p className="mt-0.5 text-sm text-slate-500">{t('runs_out_on', { date: dayLabel(r.days_left, lang) })}</p>
                       </div>
                       <span
                         className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${

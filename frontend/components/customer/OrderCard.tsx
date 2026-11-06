@@ -41,6 +41,7 @@ export default function OrderCard({ order: o, lang, onToast, onChanged }: Props)
     }
   })();
 
+  const checked = ['approved', 'packed', 'dispatched'].includes(o.status); // a pharmacist has signed it off
   const canPay = o.paid !== 1 && o.payment !== 'upi_test' && !['rejected', 'on_hold'].includes(o.status);
   const showNote = o.status === 'on_hold' && o.note && !DEFAULT_NOTES.includes(o.note);
 
@@ -76,8 +77,16 @@ export default function OrderCard({ order: o, lang, onToast, onChanged }: Props)
   };
 
   return (
-    <article className={`${card} space-y-5`} aria-label={o.code}>
-      <header className="min-w-0">
+    <article className={`${card} relative space-y-5`} aria-label={o.code}>
+      {checked && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-4 top-4 -rotate-6 whitespace-pre-line rounded-md border-2 border-double border-teal-700/70 px-2 py-0.5 text-center text-[0.65rem] font-bold leading-tight text-teal-800/80 mix-blend-multiply"
+        >
+          {t('stamp_checked')}
+        </span>
+      )}
+      <header className={`min-w-0 ${checked ? 'pr-24' : ''}`}>
         <h3 className="text-xl text-slate-900">
           {(o.items || [])
             .filter((i: any) => i.status !== 'rejected')
