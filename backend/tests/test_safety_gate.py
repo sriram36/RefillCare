@@ -514,3 +514,21 @@ def test_catalogue_search_is_for_pharmacists_and_hides_generics(people):
     assert names and all(n.startswith("Metformin") and "(generic)" not in n for n in names)
     everything = c.get("/api/medicines", headers=ph).json()
     assert 1 < len(everything) <= 20 and all("(generic)" not in m["name"] for m in everything)
+
+
+# ---- the root page says whether AI reading is on, without leaking anything ----
+
+def test_root_reports_whether_ai_reading_is_configured_and_never_leaks_the_keys(monkeypatch):
+    import core.config as cfg
+    monkeypatch.setattr(cfg, "AZURE_ENDPOINT", "")
+    monkeypatch.setattr(cfg, "AZURE_KEY", "")
+    assert c.get("/").json()["ai_reading"] is False
+
+    monkeypatch.setattr(cfg, "AZURE_ENDPOINT", "https://example.openai.azure.com")
+    monkeypatch.setattr(cfg, "AZURE_KEY", "super-secret-key-123")
+    body = c.get("/")
+    assert body.json()["ai_reading"] is True
+    assert "super-secret-key-123" not in body.text and "example.openai.azure.com" not in body.text
+
+    monkeypatch.setattr(cfg, "AZURE_KEY", "")  # an endpoint without a key is not enough
+    assert c.get("/").json()["ai_reading"] is False
