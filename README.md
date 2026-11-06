@@ -38,7 +38,7 @@ RefillCare/
 │   │   ├── routing.py        # Nearest-store inventory routing
 │   │   ├── payments.py       # Razorpay order generation & HMAC verification
 │   │   └── notifications.py  # SMS / WhatsApp dispatch logging
-│   ├── tests/                # 34 automated unit & safety gate tests
+│   ├── tests/                # 66 automated tests: the approval gate on every order path, stock, payments, ownership, DPDP
 │   ├── requirements.txt      # Python dependencies
 │   └── Dockerfile            # Container configuration for Render
 ├── frontend/                 # Dedicated Next.js 14 App Router client
@@ -48,8 +48,7 @@ RefillCare/
 │   ├── package.json          # Node dependencies
 │   └── tailwind.config.js    # Healthcare palette & styling tokens
 ├── e2e/                      # Automated end-to-end testing
-│   ├── smoke.js              # Lightweight puppeteer smoke test across all roles
-│   └── full_verification.js  # Full multi-role responsive test suite (1200px & 390px)
+│   └── demo_flow.js          # Walks the whole demo story through the real screens (28 checks, incl. 390px phone)
 ├── docs/                     # Technical specifications & documentation
 │   ├── PRD.md                # Product Requirements Document
 │   ├── TDD.md                # Technical Design Document
@@ -67,15 +66,15 @@ RefillCare is organized into two decoupled services:
 
 1. **Modern Frontend (`/frontend`):**
    - **Stack:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons. Hosted on **Vercel**.
-   - **Design:** Clean typography, calm healthcare aesthetics, high-contrast accessible states, role switcher, and trilingual support (English, বাংলা, हिन्दी).
+   - **Design:** Minimal and calm: 17px base text, one primary action per screen, teal on white, large touch targets, no promotional content, and no screen that scrolls sideways at 390px. Customer screens are fully trilingual (English, বাংলা, हिन्दी); `npm run check:i18n` keeps the three dictionaries in step.
    - **Portals:**
-     - **Customer App:** 1-tap monthly refills, active "Running Low" chips (&le;5 days supply), live search across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), prescription photo upload, 5-stage order tracking, and DPDP Act data rights.
+     - **Customer App:** a home screen led by one large **Reorder now** button for whatever is running low (&le;5 days of supply), prescription photo upload for who it is for, medicine search and cart (over-the-counter only), 4-step order tracking in plain sentences, reminder messages, the generic-consent prompt, auto-refill, and DPDP rights: download or delete your data.
      - **Pharmacist Queue:** Side-by-side sticky prescription viewer and AI draft match lines, Schedule H1 regulatory register modal, rejection with mandatory reason, and generic savings offer.
      - **Store Staff Screen:** Store-scoped pick and pack workflow with hard regulatory gate preventing dispatch until pharmacist approval, invoice entry, and courier handover.
-     - **Central Operations Dashboard:** Real-time metrics across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), median verification SLA tracker (< 10 min benchmark), low-stock inventory alerts (&le; 5 units), daily stock CSV sync, and automated refill reminders trigger.
+     - **All-stores dashboard:** orders by store, median verification time against the 10-minute target, rejections with reasons, low-stock alerts (&le; 5 packs), the H1 register, daily stock CSV upload, reminders, and a measured count of items sent without approval (must be 0). The client's chain has 46 stores; this demo seeds the three stores named in the brief.
 
 2. **Backend API (`/backend`):**
-   - **Stack:** FastAPI, Python 3.10+, SQLite (local) / PostgreSQL (production), Fernet (AES-128-CBC with HMAC-SHA256) encryption. Hosted on **Render Web Service**.
+   - **Stack:** FastAPI, Python 3.10+, SQLite, Fernet (AES-128-CBC with HMAC-SHA256) encryption. Hosted on **Render Web Service**. PostgreSQL support is unfinished (tables are only created for SQLite), so leave `DATABASE_URL` unset.
    - **Compliance:**
      - Drugs and Cosmetics Act & Rules: Schedule H and H1 medicines require registered pharmacist approval; Schedule X and narcotic items are strictly prohibited online; Schedule H1 sales are logged to a statutory register.
      - DPDP Act 2023: Prescriptions are encrypted at rest with Fernet (AES-128-CBC with HMAC-SHA256), access is logged in an audit log (append-only table; not cryptographically tamper-proof), and minor profiles require explicit guardian consent.
@@ -149,14 +148,17 @@ All test accounts authenticate using OTP: **`123456`**.
 ## Automated Verification & Tests
 
 ```bash
-# 1. Backend safety gate & business rule tests (34 tests passed)
+# 1. Backend safety gate & business rule tests (66 tests)
 cd backend
 python -m pytest tests -q
 
-# 2. Automated smoke test (logs in as each role and checks the main screen loads)
-node e2e/smoke.js https://refillcare.vercel.app
+# 2. The whole demo story, end to end, through the real UI (needs Chrome; resets the demo data first)
+node e2e/demo_flow.js http://localhost:3000
 
-# 3. Frontend production build & typecheck
+# 3. Translations: every key exists in English, Bengali and Hindi
+(cd frontend && npm run check:i18n)
+
+# 4. Frontend production build & typecheck
 cd frontend
 npm run build
 ```

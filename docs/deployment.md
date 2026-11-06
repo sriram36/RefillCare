@@ -11,24 +11,22 @@ It features a dedicated **Next.js 14 App Router frontend** and a high-performanc
 
 ## Try This in 3 Minutes
 
-Reviewers can verify the core regulatory gates and workflows in under 3 minutes on the live deployment:
-- **Demo OTP:** `123456` across all pre-seeded demo accounts.
+Sign in with the demo accounts listed under the phone and OTP form. The OTP is `123456`. **Restart demo** (on the sign-in screen) puts everything back to the start, so you can repeat this as often as you like. The full scripted walk-through, with what to say at each step, is in **[DEMO.md](DEMO.md)**.
 
-1. **Verify the Schedule H Regulatory Gate (403 Block)**
-   - Click the 1-tap login for **Behala Store Staff** (`9000000082`).
-   - Notice order `RX-50214` (Telmisartan 40 mg, Schedule H) has a disabled button: *"Awaiting Pharmacist Check"*.
-   - Attempting to pack or dispatch without registered pharmacist approval is strictly blocked by the backend with HTTP `403 APPROVAL_REQUIRED`.
-2. **Review Prescription & Doctor License as Pharmacist**
-   - Sign out and click 1-tap login for **Anita Rao** (`9000000099`).
-   - In the verification queue, review `RX-50214` side-by-side with the prescription viewer, inspect the doctor's WBMC registration check badge, and click **Approve Line**.
-   - Notice how generic bioequivalent substitution (Janaushadhi) can be offered with 1 click.
-3. **Inspect the Executive Dashboard**
-   - Click the **Central Operations** tab in the top header.
-   - View real-time fulfillment KPIs across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), verification SLA (< 10 min vs target), stock levels, and drop-off prevention metrics.
-4. **Test Prescription OCR & AI Vision Parsing**
-   - Sign in as **Debasish Ghosh** (`9000000001`) or **Rina Sen** (`9000000002`).
-   - In the **Upload Prescription** section, choose a verified demo chip (e.g. *Clear Printed*, *Handwritten Rx*, *Blurry Photo*, or *Schedule X*) or upload any PNG/JPEG image file.
-   - Click **Submit Prescription Order**, then switch to **Anita Rao** (`9000000099`) to view the extracted medicines with confidence ratings and side-by-side image verification. Blurry images automatically go *On Hold*, and Schedule X items are automatically flagged *Rejected*.
+1. **See that nothing leaves a store before a pharmacist approves it**
+   - Sign in as **Behala store**. Order `RX-50214` (Telmisartan, Schedule H) is locked, and its pack button reads *Waiting for the pharmacist*.
+   - Even calling the API directly is refused: `POST /api/orders/RX-50214/pack` returns `403 APPROVAL_REQUIRED`.
+2. **Check a prescription as the pharmacist**
+   - Sign in as **Anita Rao**. Open `RX-50214`. The prescription is on the left and the medicines the AI read are on the right, so you can compare them. Press **Approve**, then **Offer to customer** to propose the cheaper generic. Nothing is swapped until the customer agrees.
+3. **Reorder as a customer in one tap**
+   - Sign in as **Debasish Ghosh**, agree to the data notice, and press **Reorder now** under *Running low*. It goes to the pharmacist queue.
+   - Sign in as **Rina Sen** and use **Send a prescription**. Under *No prescription handy?* pick a sample: *Not sold online* shows a Schedule X line being rejected on sight, and *Blurry* is sent back for a clearer photo.
+4. **Look across all stores**
+   - As Anita, open the **All stores** tab: median verification time, orders by store, rejections with reasons, low stock, the H1 register, and a measured count of items sent without approval (which must be 0).
+5. **See the reminder and the languages**
+   - On the dashboard, press **Send today's reminders**. Sign in as Debasish: the message is under *Messages*. Change the language (top right) to বাংলা or हिन्दी.
+
+To run the whole story automatically and check it: `node e2e/demo_flow.js <app url>`.
 
 ---
 
@@ -102,7 +100,12 @@ Open `http://localhost:8000/docs` to explore the OpenAPI documentation.
 4. **Environment Variables:**
    - `APP_SECRET`: `<generate a long random value; never commit it>`
    - `RX_ENC_KEY`: (optional, auto-generated from APP_SECRET if omitted)
-   - `DATABASE_URL`: `postgresql://user:pass@host:5432/dbname` (optional; when set, backend seamlessly runs on PostgreSQL via psycopg2 pool; when omitted, uses SQLite with WAL mode)
+   - `DEMO_MODE`: `true` (default) keeps the one-click **Restart demo** endpoint. **Set `false` for a real deployment**: the endpoint then returns 404.
+   - `PAYMENT_MODE`: `test` (default). The server confirms test payments for the signed-in customer. No money moves.
+   - `RAZORPAY_WEBHOOK_SECRET`: the secret that signs real gateway callbacks. **Without it the payment webhook stays closed** (it rejects every call), which is the safe default.
+   - `RULES_FILE`: optional path to a rules file. By default `backend/data/rules.json` sets which schedules need a prescription, which are never sold online, and how long a prescription stays valid. Edit it when the online-pharmacy rules change. A malformed file stops the server on start, so the safety gate can never loosen silently.
+   - `CORS_ORIGINS`: comma-separated list of allowed front-end origins. Set it to your Vercel URL in production (the default `*` is for local use).
+   - `DATABASE_URL`: **leave unset.** PostgreSQL support is unfinished: the queries are translated, but the tables are only created for SQLite, so a fresh Postgres database would be empty and fail. Use the default SQLite file.
    - `AZURE_OPENAI_ENDPOINT`: `https://rag-42.openai.azure.com` (optional for live Azure Vision)
    - `AZURE_OPENAI_KEY`: `<your-azure-key>` (optional)
    - `AZURE_OPENAI_DEPLOYMENT`: `gpt-5.6-luna` (optional, defaults to `gpt-5.6-luna`)
@@ -156,45 +159,38 @@ Open `http://localhost:3000` in your browser.
 
 ---
 
-## 6. Pre-seeded Demo Logins & General Sign-In
+## 6. Demo Logins & Sign-In
 
-The authentication interface provides two modes:
-1. **1-Tap Demo Roles:** Instant 1-tap sign-in buttons for all pre-seeded evaluation personas (Demo OTP: `123456`).
-2. **General Sign In / Register:** Reviewers or testers can enter any 10-digit mobile number (e.g. `9876543210`) with OTP `123456` and optional Name. Any non-seeded number automatically provisions a fresh customer account with isolated chronic order history and DPDP consent tracking.
+The sign-in screen has a phone number and OTP form (OTP `123456`). Any new 10-digit number creates a fresh customer account with its own order history and its own consent record. Below the form is a **Demo accounts** list for reviewers, with one tap per person, and a **Restart demo** button that calls `POST /api/demo/reset`. The reset restores the sample orders, stock, reminders and the three demo customers' consent. It never deletes the access log, which is the record of who opened which prescription.
 
-Additionally, a **Restart Demo Flow** button is available in the top header and on the sign-in modal, calling `POST /api/demo/reset` to restore orders and verification queues to initial demo state whenever needed.
-
-| Persona | 1-Tap Button Label | Phone | Primary Role / Action |
-|---|---|---|---|
-| **Customer** | Debasish Ghosh | `9000000001` | 1-tap reorder (Metformin for Mother, 4 days left) |
-| **Customer** | Rina Sen | `9000000002` | Telmisartan refill, generic substitute consent |
-| **Customer** | Arif Mondal | `9000000003` | Levothyroxine (prescription re-upload on hold) |
-| **Pharmacist** | Anita Rao | `9000000099` | Verification queue, Schedule H1 approval, Generics |
-| **Store Staff** | Salt Lake Store #81 | `9000000081` | Fulfillment, invoice generation, courier dispatch |
-| **Store Staff** | Behala Store Staff | `9000000082` | Proves regulatory gate (dispatch blocked) |
-| **Store Staff** | Howrah Store #83 | `9000000083` | Routed store fulfillment |
+| Persona | Phone | What it shows |
+|---|---|---|
+| **Debasish Ghosh** (customer) | `9000000001` | Mother's Metformin is 4 days from running out: one-tap reorder |
+| **Rina Sen** (customer) | `9000000002` | Order waiting for the pharmacist; generic offer; Schedule X sample |
+| **Arif Mondal** (customer) | `9000000003` | Prescription sent back as unreadable; re-sends a clearer photo |
+| **Anita Rao** (pharmacist) | `9000000099` | Verification queue, H1 register, the all-stores dashboard |
+| **Salt Lake / Behala / Howrah Maidan** (store staff) | `9000000081` / `82` / `83` | Pack, enter the invoice number, hand over; the locked state before approval |
 
 ---
 
 ## 7. Verification & Testing
 
-### Backend Unit & Integration Tests (34/34 passing)
+### Backend tests (66)
 ```bash
 cd backend
+python -m pip install -r requirements.txt
 python -m pytest tests -q
 ```
+Each test file starts from its own freshly seeded database. `tests/test_safety_gate.py` tries every way of creating an order (upload, refill, subscription, re-upload, cart, generic swap) and checks that none of them can be packed or dispatched without a pharmacist's approval, that Schedule X and narcotics are never sold, and that stock, payments and ownership cannot be bypassed.
 
-### Automated End-to-End Smoke Test
-Run against the live Vercel deployment:
+### End-to-end demo flow (28 checks)
+Needs Chrome (set `CHROME_PATH` if it is not in the usual place). Start the backend and the frontend, then:
 ```bash
-node e2e/smoke.js https://refillcare.vercel.app
+node e2e/demo_flow.js http://localhost:3000
 ```
-Or against local dev:
-```bash
-node e2e/smoke.js http://localhost:3000
-```
+It resets the demo data, then walks the whole story through the real screens as each person and fails if any step breaks, or if any screen scrolls sideways on a 390px phone. It can be run repeatedly. Screenshots are saved to `screenshots/demo/`. Against the deployed app, pass the Vercel URL and set `API_URL` to the Render URL.
 
-### Frontend Production Build
+### Frontend production build
 ```bash
 cd frontend
 npm run build

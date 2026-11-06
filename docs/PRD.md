@@ -53,7 +53,7 @@ Company A runs a pharmacy network across Kolkata and Howrah (the client's chain 
 | Customer or caregiver (mobile) | Reorder in a minute; calm, trustworthy app; often ordering for a parent | Customer role |
 | Store pharmacist | See the prescription beside the matched items; approve, edit or reject with a reason | Pharmacist role |
 | Store staff | Pick, pack, enter the store invoice number, hand over to delivery | Store staff role (scoped per store) |
-| Central operations | One view of orders across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief) | Central Operations tab in Pharmacist view |
+| Central operations | One view of orders across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief) | All stores tab in the pharmacist view |
 
 ---
 
@@ -175,15 +175,15 @@ Company A runs a pharmacy network across Kolkata and Howrah (the client's chain 
 | Consent & Erasure | DPDP consent capture upon login; Section 12 Right to Erasure (`/api/me/forget`) | Built |
 | Rate limiting | In-memory 5 attempts / 10 min rate limiting on login | Built |
 | Security headers | OWASP headers (`nosniff`, `DENY`, `strict-origin`) injected | Built |
-| Scale | Dual-engine: SQLite local / PostgreSQL in production with connection pool | Built |
+| Scale | SQLite. A PostgreSQL adapter exists but is unfinished (tables are only created for SQLite) | Partly built |
 
 ---
 
 ## 11. Quality and Test Status
 
-- **34 automated backend tests** (`python -m pytest backend/tests -q`): gate, routing, generic consent, H1 register, role scoping, validation, search/cart, reminders, payments, storage, persistence, subscriptions, transfers, and security.
-- **Automated E2E smoke test** (`node e2e/smoke.js`) verifying Customer, Pharmacist, Store Staff, and Dashboard against the live Vercel URL.
-- **Responsive verification suite** (`node e2e/full_verification.js`) verified across 1200px desktop and 390px mobile viewports.
+- **66 automated backend tests** (`python -m pytest backend/tests -q`): the approval gate on every order path, Schedule X, routing and stock, generic consent, H1 register, role scoping and ownership, search/cart, reminders, signed payments, storage, subscriptions, transfers, the rules file, and security.
+- **End-to-end demo flow** (`node e2e/demo_flow.js <url>`): the whole story through the real screens as each person, 28 checks, including a 390px phone check that no screen scrolls sideways.
+- **Translation check** (`npm run check:i18n` in `frontend/`).
 
 ---
 
@@ -193,7 +193,7 @@ Company A runs a pharmacy network across Kolkata and Howrah (the client's chain 
 - Real SMS / WhatsApp Business API sending (mocked in-app & log lines only).
 - Live Azure reading not measured on real handwriting (tested on synthetic demo prescriptions only; real clinical accuracy not benchmarked without physical doctor slips).
 - Bengali and Hindi translations in `i18n.ts` need review by a native clinical speaker.
-- Free Render instance resets SQLite database data on sleep/restart (persistent storage requires managed PostgreSQL).
+- Free Render instance resets SQLite database data on sleep/restart (persistent storage needs a paid disk, or finishing the PostgreSQL support).
 
 ---
 

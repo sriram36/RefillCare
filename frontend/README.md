@@ -10,33 +10,27 @@ Dedicated modern web application for RefillCare pharmacy reorder and verificatio
 - **API Client:** Clean fetch wrapper with token authentication and DPDP Act compliance handling
 
 ## Roles & Screens
-1. **Customer Web App (`CustomerView.tsx`):**
-   - 1-Tap monthly medicine reorder hero button
-   - "Running Low" active alerts for chronic prescriptions (Metformin, Telmisartan, Levothyroxine)
-   - Real-time medicine search with live stock check across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief)
-   - Prescription upload with AI reading draft indicator
-   - 5-stage live order tracking timeline
-   - Generic substitution consent & savings prompt
-   - DPDP Act family profiles and data download
-2. **Pharmacist Verification Queue (`PharmacistView.tsx`):**
-   - Split-screen verification workspace
-   - Side-by-side encrypted prescription image viewer & AI matched items
-   - Approval & rejection with mandatory reason recording
-   - Drugs & Cosmetics Act Rule 65(9) Schedule H1 Register prompt
-   - DPDP Act prescription access audit log
-   - One-click generic substitution offer
-3. **Store Order Screen (`StoreView.tsx`):**
-   - Store order fulfillment queue scoped to store staff
-   - Hard regulatory gate preventing packing/dispatch before pharmacist approval
-   - Packing with billing software invoice number recording
-   - Handover to local courier/delivery executive
-4. **Central Operations & Executive Dashboard (`DashboardView.tsx`):**
-   - Store network summary table (the client's chain has 46 stores; this demo seeds the three stores named in the brief)
-   - Median verification SLA tracker (< 10 min benchmark)
-   - Low-stock inventory alerts (<= 5 units)
-   - Drugs & Cosmetics Act Schedule H1 Register compliance log
-   - Daily store stock CSV file uploader
-   - Automated refill reminders engine trigger
+Design rules: 17px base text, one primary action per screen, teal on white, large touch targets, nothing promotional, no sideways scrolling at 390px. Customer-facing text goes through `lib/i18n.ts` in English, Bengali and Hindi, and `npm run check:i18n` keeps the three in step.
+
+1. **Customer (`CustomerView.tsx`, `components/customer/`):**
+   - Home leads with whatever is running low (5 days or fewer) and one large **Reorder now** button; it becomes "already in progress" once an order is open
+   - Reminder messages, "Send a prescription" (who it is for, area, payment, photo) and "Find a medicine" (over-the-counter cart) open on demand
+   - Orders as one plain sentence plus a 4-step progress line, UPI test payment, re-upload when a photo is sent back
+   - Generic offer with explicit Accept / Keep original
+   - Auto-refill from a refill card, family profiles (a parent or guardian must consent for under 18), download or delete my data
+2. **Pharmacist (`PharmacistView.tsx`):**
+   - Queue sorted with what needs checking first and how long it has waited
+   - The prescription image beside the matched items (AI draft), zoom, approve with quantity, reject with a reason, ask for a new photo
+   - Schedule H1 register form; offer a cheaper generic (customer must agree)
+   - Who opened the prescription (access log)
+3. **Store (`StoreView.tsx`):**
+   - Orders for this store only, locked until a pharmacist approves
+   - Pack with the invoice number from the billing software, hand over to delivery
+   - Stock transfers between stores
+4. **All stores (`DashboardView.tsx`):**
+   - Median verification time against the 10-minute target, orders by store, rejections with reasons, low stock, the H1 register
+   - Measured count of items sent without approval (must be 0)
+   - Daily stock CSV upload, send reminders, recent activity
 
 ## Quick Start (Local Development)
 
