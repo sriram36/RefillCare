@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ShieldCheck, BarChart3, CheckCircle, Sparkles, Shield, Clock } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 import { getUser, setUser as setStoredUser, setToken, postApi } from '../lib/api';
 import Header from '../components/Header';
@@ -15,10 +15,12 @@ import DashboardView from '../components/DashboardView';
 export default function Home() {
   const [user, setUser] = useState<any | null>(null);
   const [lang, setLang] = useState<Language>('en');
-  // Only pharmacists have a 2-tab UI; customers & store staff go straight to their view
+  // Only pharmacists have two tabs; customers and store staff go straight to their screen
   const [activeTab, setActiveTab] = useState<'pharmacist' | 'dashboard'>('pharmacist');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  const t = (k: string) => translate(k, lang);
 
   useEffect(() => {
     setMounted(true);
@@ -33,6 +35,11 @@ export default function Home() {
     }
   }, []);
 
+  // keep the page language attribute right for screen readers and fonts
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => {
@@ -40,15 +47,21 @@ export default function Home() {
     }, 4500);
   };
 
+  // Reminders are sent in the customer's language, so the server needs to know it
+  const rememberLanguage = (l: Language) => {
+    postApi('me/language', { lang: l }).catch(() => {});
+  };
+
   const handleLangChange = (newLang: Language) => {
     setLang(newLang);
     localStorage.setItem('lang', newLang);
+    if (user) rememberLanguage(newLang);
   };
 
   const handleLoginSuccess = (loggedInUser: any) => {
     setUser(loggedInUser);
     if (loggedInUser.role === 'pharmacist') setActiveTab('pharmacist');
-    showToast(`Welcome back, ${loggedInUser.name}`);
+    rememberLanguage(lang);
   };
 
   const handleLogout = async () => {
@@ -61,176 +74,97 @@ export default function Home() {
     setStoredUser(null);
     setUser(null);
     setActiveTab('pharmacist');
-    showToast('Signed out successfully');
   };
 
   const handleResetDemo = async () => {
     try {
       await postApi('demo/reset');
-      showToast('Demo data reset to clean initial Step 1 state!');
+      showToast('Demo data restored.');
       window.location.reload();
     } catch (err: any) {
-      showToast(err.message || 'Failed to reset demo');
+      showToast(err.message || 'Could not restart the demo.');
     }
   };
 
-  // Suppress SSR/hydration mismatch
+  // Avoid a server/client mismatch flash
   if (!mounted) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-xs font-medium">Loading RefillCare Network…</span>
-        </div>
+      <div className="flex h-screen items-center justify-center bg-stone-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-700 border-t-transparent" role="status" aria-label="Loading" />
       </div>
     );
   }
 
+  const isStaff = user && user.role !== 'customer';
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-teal-100 selection:text-teal-900">
-      {/* Sticky Header */}
-      <Header user={user} lang={lang} onLangChange={handleLangChange} onLogout={handleLogout} onResetDemo={handleResetDemo} />
+    <div className="flex min-h-screen flex-col bg-stone-50 text-slate-900">
+      <Header user={user} lang={lang} onLangChange={handleLangChange} onLogout={handleLogout} />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-
-        {/* ══════════════ UNAUTHENTICATED — Landing + Auth ══════════════ */}
+      <main className={`mx-auto w-full flex-1 px-4 py-8 sm:px-6 ${isStaff ? 'max-w-7xl' : 'max-w-2xl'}`}>
         {!user ? (
-          <div className="space-y-8 py-6">
-            <div className="text-center max-w-3xl mx-auto space-y-4">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold shadow-2xs">
-                <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-                RefillCare • Kolkata &amp; Howrah Pharmacy Network
-              </div>
-              <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                Monthly Medicine Refills in 60 Seconds
-              </h1>
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
-                Rapid prescription verification by licensed pharmacists, bioequivalent generic savings under
-                Pradhan Mantri Janaushadhi guidelines, and same-day delivery from your nearest neighborhood pharmacy.
-              </p>
-
-              {/* Trust badges */}
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs font-semibold text-slate-700">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 shadow-2xs">
-                  <Shield className="w-3.5 h-3.5 text-teal-700" />
-                  WBMC Registered Pharmacists
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 shadow-2xs">
-                  <Clock className="w-3.5 h-3.5 text-teal-700" />
-                  &lt; 10 Min Verification SLA
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 shadow-2xs">
-                  <ShieldCheck className="w-3.5 h-3.5 text-teal-700" />
-                  DPDP Act 2023 Encrypted
-                </span>
-              </div>
+          <div className="space-y-8">
+            <div className="space-y-3">
+              <h1 className="text-3xl font-bold leading-tight text-slate-900 sm:text-4xl">{t('login_title')}</h1>
+              <p className="text-lg text-slate-600">{t('login_sub')}</p>
             </div>
-
             <AuthModal lang={lang} onLoginSuccess={handleLoginSuccess} onError={showToast} onResetDemo={handleResetDemo} />
           </div>
-
         ) : (
-          /* ══════════════ AUTHENTICATED — role-gated, no cross-role surfing ══════════════ */
-          <div className="space-y-6">
+          <>
+            {user.role === 'customer' && <CustomerView user={user} lang={lang} onToast={showToast} onErased={handleLogout} />}
 
-            {/* ── CUSTOMER: direct full-screen view, zero tabs ── */}
-            {user.role === 'customer' && (
-              <CustomerView user={user} lang={lang} onToast={showToast} />
-            )}
+            {user.role === 'store' && <StoreView user={user} onToast={showToast} />}
 
-            {/* ── STORE STAFF: direct full-screen view, zero tabs ── */}
-            {user.role === 'store' && (
-              <StoreView user={user} lang={lang} onToast={showToast} />
-            )}
-
-            {/* ── PHARMACIST: 2-tab nav (Verification ↔ Central Operations) ── */}
             {user.role === 'pharmacist' && (
-              <>
-                {/* Pharmacist-only pill nav */}
-                <div className="flex items-center justify-between border-b border-slate-200/80 pb-3 flex-wrap gap-3">
-                  <div className="flex items-center gap-1 sm:gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
+              <div className="space-y-6">
+                <div role="tablist" className="inline-flex rounded-xl border border-slate-300 bg-white p-1">
+                  {(
+                    [
+                      ['pharmacist', 'Verification queue'],
+                      ['dashboard', 'All stores'],
+                    ] as const
+                  ).map(([key, label]) => (
                     <button
-                      onClick={() => setActiveTab('pharmacist')}
-                      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                        activeTab === 'pharmacist'
-                          ? 'bg-white text-purple-950 shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900'
+                      key={key}
+                      role="tab"
+                      aria-selected={activeTab === key}
+                      onClick={() => setActiveTab(key)}
+                      className={`h-11 rounded-lg px-4 text-base font-semibold ${
+                        activeTab === key ? 'bg-teal-700 text-white' : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
-                      Pharmacist Verification
+                      {label}
                     </button>
-
-                    <button
-                      onClick={() => setActiveTab('dashboard')}
-                      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                        activeTab === 'dashboard'
-                          ? 'bg-white text-teal-950 shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <BarChart3 className="w-3.5 h-3.5 text-teal-700" />
-                      Central Operations
-                    </button>
-                  </div>
-
-                  {/* Identity / role badge */}
-                  <div className="text-xs text-slate-500 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
-                    <span className="font-bold text-slate-900">{user.name}</span>
-                    <span className="mx-1.5 text-slate-300">•</span>
-                    <span className="text-purple-700 font-semibold">Pharmacist</span>
-                  </div>
+                  ))}
                 </div>
 
-                {/* Tab content */}
                 {activeTab === 'pharmacist' && (
-                  <PharmacistView
-                    user={user}
-                    lang={lang}
-                    onToast={showToast}
-                    onOpenDashboard={() => setActiveTab('dashboard')}
-                  />
+                  <PharmacistView onToast={showToast} />
                 )}
                 {activeTab === 'dashboard' && (
-                  <DashboardView
-                    user={user}
-                    lang={lang}
-                    onToast={showToast}
-                    onBackToQueue={() => setActiveTab('pharmacist')}
-                  />
+                  <DashboardView onToast={showToast} onBackToQueue={() => setActiveTab('pharmacist')} />
                 )}
-              </>
+              </div>
             )}
-
-          </div>
+          </>
         )}
-
       </main>
 
-      {/* Toast notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-2xl bg-slate-900/95 px-5 py-3.5 text-xs font-semibold text-white shadow-2xl backdrop-blur-md border border-slate-700/50 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+        <div
+          role="status"
+          className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-xl bg-slate-900 px-5 py-4 text-base font-medium text-white sm:bottom-6"
+        >
+          <CheckCircle className="h-5 w-5 shrink-0 text-teal-200" aria-hidden="true" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200/80 bg-white py-6 text-center text-xs text-slate-500 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-700">RefillCare Healthcare</span>
-            <span>•</span>
-            <span className="text-slate-600 font-semibold">
-              Kolkata &amp; Howrah Pharmacy Network
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/compliance" className="text-slate-600 hover:text-teal-800 font-semibold hover:underline">
-              DPDP Act (2023) &amp; Rule 65 Compliance
-            </Link>
-          </div>
-        </div>
+      <footer className="border-t border-slate-200 bg-white py-5 text-center text-base text-slate-500">
+        <Link href="/compliance" className="font-medium text-slate-600 underline-offset-4 hover:underline">
+          {t('legal_link')}
+        </Link>
       </footer>
     </div>
   );

@@ -2,9 +2,8 @@ import base64
 import io
 import json
 import logging
-import os
 import time
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from core.config import AZURE_ENDPOINT, AZURE_KEY, AZURE_DEPLOY
 from rules import validate_doctor_reg
 
@@ -124,21 +123,42 @@ def extract(raw: bytes, demo: str) -> dict:
     return demo_data
 
 
+def _font(size: int):
+    """A readable scalable font. Older Pillow only has a tiny bitmap one, so fall back to it."""
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
 def demo_png(kind: str) -> bytes:
+    """A sample prescription for the demo. It shows what the AI draft says, in a size a person can read,
+    so the pharmacist can really compare the sheet with the matched items beside it."""
     if kind not in DEMOS:
         return b""
-    im = Image.new("RGB", (560, 380), "white")
+    demo = DEMOS[kind]
+    doctor = demo.get("doctor") or {"name": "Dr. A. Banerjee", "reg": "WBMC-12345"}
+    lines = demo.get("lines") or [{"text": "illegible", "qty": ""}]
+
+    im = Image.new("RGB", (760, 400), "white")
     draw = ImageDraw.Draw(im)
-    draw.text((20, 20), "Dr. A. Banerjee, Reg. No. WB-12345 (WBMC)", fill="black")
-    lines = DEMOS[kind].get("lines") or [{"text": "illegible"}]
+    ink = (28, 40, 90)
+    draw.text((32, 26), doctor.get("name") or "Dr. A. Banerjee", fill=ink, font=_font(46))
+    draw.text((32, 84), f"Reg. No. {doctor.get('reg') or ''}   Kolkata", fill=(70, 80, 100), font=_font(30))
+    draw.line((32, 134, 728, 134), fill=(150, 160, 175), width=3)
+    draw.text((32, 150), "Rx", fill=ink, font=_font(60))
     for i, line in enumerate(lines):
+        qty = line.get("qty", "")
         draw.text(
-            (30, 80 + i * 40),
-            f"Rx  {line['text']}   x{line.get('qty', '')}",
-            fill="black",
+            (120, 168 + i * 66),
+            f"{i + 1}.  {line['text']}   x {qty}",
+            fill=ink,
+            font=_font(44),
         )
+    draw.text((32, 362), "Sample prescription for demonstration only", fill=(130, 135, 145), font=_font(22))
+
     if kind == "blurry":
-        im = im.filter(ImageFilter.GaussianBlur(7))
+        im = im.filter(ImageFilter.GaussianBlur(9))
     buf = io.BytesIO()
     im.save(buf, "PNG")
     return buf.getvalue()

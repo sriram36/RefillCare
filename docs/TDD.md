@@ -15,14 +15,14 @@ RefillCare is an end-to-end pharmacy reordering platform designed for Company A:
 1. **Frontend Client (`/frontend`):**
    - Standalone Next.js 14 application utilizing the App Router, React 18, TypeScript, and Tailwind CSS.
    - Hosted on **Vercel** (`https://refillcare.vercel.app`), configured with zero hardcoded URLs via `NEXT_PUBLIC_API_URL=https://refillcare.onrender.com`.
-   - Features role-gated views: Customers and Store Staff each get dedicated, full-screen single-purpose workspaces without cross-role navigation tabs; Pharmacists receive a 2-tab interface (Verification Queue ↔ Central Operations).
+   - Features role-gated views: Customers and Store Staff each get dedicated, full-screen single-purpose workspaces without cross-role navigation tabs; Pharmacists receive a 2-tab interface (Verification queue ↔ All stores).
    - Fully responsive down to 390px mobile viewports with zero horizontal scrolling.
    - Accessible trilingual localization (English, বাংলা, हिन्दी) across all customer touchpoints.
 
 2. **Backend API Service (`/backend`):**
    - High-performance Python FastAPI service deployed via Docker on **Render** (`https://refillcare.onrender.com`).
    - Pure regulatory and safety business rules live strictly in [`rules.py`](file:///d:/pharmacy-reorder/backend/rules.py) with zero database dependencies, ensuring 100% deterministic test coverage.
-   - **Dual-Persistence Engine:** The universal database layer in [`database/session.py`](file:///d:/pharmacy-reorder/backend/database/session.py) auto-detects `DATABASE_URL` in production to run PostgreSQL with connection pooling (`psycopg2`), while defaulting to SQLite in WAL mode with a 20-second busy timeout for local development. Parameterized queries (`?` translated to `%s` for Postgres) prevent SQL injection.
+   - **Database layer:** [`database/session.py`](../backend/database/session.py) uses SQLite in WAL mode with a 20-second busy timeout, with parameterized queries throughout. It contains a PostgreSQL adapter (`?` translated to `%s`, a connection pool, rollback on error), but **PostgreSQL support is unfinished**: the tables and seed data are only ever created through SQLite, so a fresh Postgres database would be empty. Leave `DATABASE_URL` unset.
    - **Encrypted Blob Storage:** Uploaded prescriptions are encrypted with Fernet (AES-128-CBC with HMAC-SHA256) keys in [`core/storage.py`](file:///d:/pharmacy-reorder/backend/core/storage.py) before writing to cloud blob storage (Azure Blob / S3) with local encrypted disk fallback.
    - OWASP security headers (`nosniff`, `DENY`, `strict-origin-when-cross-origin`) are injected on all responses.
 
@@ -42,7 +42,6 @@ The schema manages the complete pharmacy reordering lifecycle:
 - `refills`: `id`, `customer_id`, `for_name`, `med_id`, `qty`, `per_day`, `last_filled`.
 - `subscriptions`: `id`, `customer_id`, `for_name`, `med_id`, `qty`, `per_day`, `frequency_days`, `next_refill`, `active`, `created` (chronic auto-refill engine).
 - `transfers`: `id`, `from_store_id`, `to_store_id`, `med_id`, `qty`, `status`, `requested_at`, `fulfilled_at` (inter-store stock balancing).
-- `payment_orders`: `id`, `order_code`, `razorpay_order_id`, `amount`, `currency`, `status`, `created_at` (payment intent tracking).
 - `profiles`: `id`, `customer_id`, `name`, `relation`, `is_minor`, `guardian_consent`.
 - `register`: `order_code`, `item_id`, `prescriber`, `patient`, `qty`, `ts` (statutory Rule 65 Schedule H1 register).
 - `audit`: `ts`, `actor`, `action`, `entity` (audit log (append-only table; not cryptographically tamper-proof) for DPDP Act compliance).
@@ -95,30 +94,33 @@ A multimodal vision model inspects uploaded prescription photos and extracts dra
 
 The following architectural decisions extend beyond the minimal brief to deliver a complete production slice, and are explicitly labelled as assumptions:
 
-- **A1 (Payment Simulation):** Razorpay / UPI intent integration is a **TEST-MODE SIMULATION**. No real currency moves. Order IDs and HMAC signatures are generated and verified cryptographically, but rely on simulated capture webhooks.
-- **A2 (Doctor Registration Validation):** Prescriber license checks (WBMC, NMC, MCI) are structurally verified against standard medical council formatting rules on synthetic demo prescriptions. No live database connection to the Medical Council registry exists.
+- **A1 (Dummy payment):** payment exists only so the screen has something to press. `POST /api/orders/{code}/pay` marks the signed-in customer's own order as paid and returns a made-up reference (`DEMO…`). There is no payment gateway: no keys, no callback, no signature, no money. Only the order's owner can call it, and it refuses orders that are on hold, rejected or already paid.
+- **A2 (Doctor Registration Validation):** `rules.validate_doctor_reg` checks the *format* of a registration number (WBMC, NMC, MCI). It is applied to the AI's reading only when live AI reading is configured, and its result is informational: it is not stored and not shown on the pharmacist screen. For Schedule H1 the pharmacist types the prescriber into the register. No connection to any Medical Council registry exists.
 - **A3 (Stock Transfers Hub):** Inter-store stock transfer requisitions between local branches and the central warehouse are implemented to solve the client's stockout drop-off problem.
 - **A4 (Statutory Compliance Center):** A formal transparency disclosure page (`/compliance`) documents patient rights under the DPDP Act 2023 and Rule 65.
 - **A5 (Chronic Auto-Refill Subscriptions):** An automated subscription engine (`/api/subscriptions`) allows recurring refills on 30/60/90 day intervals to prevent the 20% customer churn.
 - **A6 (Prescription Validity Period):** In the absence of a stated validity window in the brief, prescriptions are assumed valid for 180 days (`RX_VALID_DAYS = 180` in `rules.py`) for chronic repeat refills.
 - **A7 (Mocked Outside Systems):** The following integrations are mocked:
   - Phone OTP: Fixed demo OTP `123456`.
-  - SMS / WhatsApp Notifications: Dispatch logged to server console via `services.notifications.notify`.
+  - SMS / WhatsApp Notifications: reminders are saved and shown under *Messages* in the app, and dispatch is logged via `services.notifications.notify`. Nothing is actually sent.
   - Delivery Partner: Delivery carrier assignment is selected and recorded upon store dispatch.
 
 ---
 
 ## 7. Honest System Limits
 
-1. **AI Handwriting Accuracy:** Live Azure OpenAI vision transcription has not been evaluated against real physical Indian doctor prescription slips (tested only on synthetic demo handwriting). Real-world accuracy on unconstrained handwriting remains unmeasured without a labeled real clinical dataset.
+1. **AI Handwriting Accuracy** (a script to measure it on labelled images is in `backend/eval/run_eval.py`): Live Azure OpenAI vision transcription has not been evaluated against real physical Indian doctor prescription slips (tested only on synthetic demo handwriting). Real-world accuracy on unconstrained handwriting remains unmeasured without a labeled real clinical dataset.
 2. **Translations:** Bengali and Hindi translations in `i18n.ts` were drafted computationally and require formal clinical review by a native Bengali/Hindi speaker.
-3. **Free Hosting Ephemeral Storage & Cold Starts:** The free Render web service tier sleeps after 15 minutes of inactivity (~50-second cold start) and resets ephemeral SQLite disk storage on restart. Connecting an external PostgreSQL instance (which the dual-engine adapter supports via `DATABASE_URL`) ensures permanent persistence.
+3. **Free Hosting Ephemeral Storage & Cold Starts:** The free Render web service tier sleeps after 15 minutes of inactivity (~50-second cold start) and resets ephemeral SQLite disk storage on restart. Permanent storage needs either a paid persistent disk for the SQLite file or finishing the PostgreSQL support (see the database layer note above).
 4. **Mocked Outside Systems:** No live SMS, WhatsApp Business API, UPI banking rail, or logistics carrier API is connected; all outside communication and payment flows are safe test simulations.
+5. **Languages on staff screens:** the customer screens and reminder messages are in English, Bengali and Hindi. The pharmacist, store and dashboard screens and the privacy page are English only.
+6. **Reminders and routing:** reminders run when a pharmacist presses the button, not on a timer. An order is routed to one store that has every item; if none does, the pharmacist is told which medicine is short and stores can request transfers from each other. Three stores are seeded, not 46.
 
 ---
 
 ## 8. Verification & Testing
 
-- **Backend Automated Tests:** **34 passed tests** (`cd backend && python -m pytest tests -q`) covering routing, regulatory gates, cloud storage, subscriptions, transfers, and security headers.
-- **Automated E2E Smoke Test:** A smoke test that logs in as each role and checks the main screen loads (`node e2e/smoke.js`).
+- **Backend Automated Tests:** **69 passed tests** (`cd backend && python -m pytest tests -q`). Each test file starts from its own freshly seeded database. `tests/test_safety_gate.py` tries every way of creating an order (upload, refill, subscription, re-upload, cart, generic swap) and checks that none can be packed or dispatched without a pharmacist's approval; it also covers Schedule X and narcotics, stock, payments, order ownership, transfers, the rules file, reminders, the pharmacist adding a line the AI missed, and the dashboard's measured numbers. The safety fixes were mutation-checked: removing each one in turn makes a test fail.
+- **End-to-end demo flow:** `node e2e/demo_flow.js <url>` runs the whole demo story through the real screens as each person (30 checks), including the locked store screen, the side-by-side review, Schedule X, the generic consent, the dashboard, reminders, Bengali and Hindi, registering and deleting a new customer, and that no screen scrolls sideways at 390px. It resets the demo data first, so it can be repeated.
+- **Translations:** `cd frontend && npm run check:i18n` fails if any language is missing a key, a `{placeholder}` differs, or a value was left in English.
 - **Frontend Production Build:** `next build` compiles all 3 static application routes (`/`, `/_not-found`, `/compliance` — 5 static pages total) with 0 errors.

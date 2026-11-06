@@ -4,7 +4,7 @@ import time
 from datetime import date, timedelta
 from cryptography.fernet import Fernet
 from core.config import BASE_DIR, DB, FKEY, STORE
-from database.session import db, ex, q, SCHEMA, ensure_schema
+from database.session import db, ex, log, q, SCHEMA, ensure_schema
 from rules import RX_VALID_DAYS
 from services.catalog import MEDS
 from services.ocr import demo_png
@@ -106,7 +106,7 @@ def init():
     )
     connection.execute(
         "update orders set created = ?, verified_at = ? where code = 'RX-50211'",
-        (now - 900, now - 300),
+        (now - 900, now - 480),  # verified in 7 minutes, under the 10-minute target
     )
     connection.execute(
         "insert into prescriptions(customer_id, profile_name, order_code, rx_file, approved_at, valid_until) values(?, ?, ?, ?, ?, ?)",
@@ -146,15 +146,28 @@ def reset_demo_data():
     now = int(time.time())
     days_ago = lambda n: (date.today() - timedelta(days=n)).isoformat()
 
-    ex("delete from payment_orders")
+    # The audit log is kept on purpose: it is the DPDP record of who opened which prescription.
     ex("delete from transfers")
     ex("delete from subscriptions")
     ex("delete from prescriptions")
     ex("delete from register")
-    ex("delete from audit")
     ex("delete from refills")
     ex("delete from items")
     ex("delete from orders")
+    ex("delete from notes")  # so the reminder demo can run again today
+    # the three seeded customers start un-consented and in English, so the consent step can be shown again.
+    # Only the seeded demo accounts: anyone who signed up themselves keeps their record.
+    ex("update users set consent_at = null, lang = 'en' where id in (1, 2, 3)")
+
+    # stock goes back to the daily CSV, because packing now uses stock up
+    stock_csv_path = os.path.join(BASE_DIR, "data", "stock.csv")
+    if os.path.exists(stock_csv_path):
+        with open(stock_csv_path, encoding="utf-8") as stock_file:
+            for r in csv.DictReader(stock_file):
+                ex(
+                    "insert or replace into stock values(?, ?, ?)",
+                    int(r["store_id"]), int(r["med_id"]), int(r["qty"]),
+                )
 
     orders = [
         ("RX-50211", 1, "Mother", "packed", 1, None, "", now, "Salt Lake"),
@@ -189,7 +202,7 @@ def reset_demo_data():
             *rf,
         )
 
-    ex("update orders set created = ?, verified_at = ? where code = 'RX-50211'", now - 900, now - 300)
+    ex("update orders set created = ?, verified_at = ? where code = 'RX-50211'", now - 900, now - 480)  # verified in 7 minutes
     ex(
         "insert into prescriptions(customer_id, profile_name, order_code, rx_file, approved_at, valid_until) values(?, ?, ?, ?, ?, ?)",
         1,
@@ -200,4 +213,5 @@ def reset_demo_data():
         (date.today() + timedelta(days=RX_VALID_DAYS)).isoformat(),
     )
     seed_images()
+    log("demo", "demo_reset", "all")
     return {"status": "ok", "message": "Demo data reset successfully"}

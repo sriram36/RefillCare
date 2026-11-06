@@ -16,10 +16,6 @@ def _get_store_dir() -> str:
     return store_dir
 
 
-def is_cloud_storage() -> bool:
-    return bool(AZURE_STORAGE_CONNECTION_STRING)
-
-
 def save_encrypted_rx(filename: str, raw_bytes: bytes) -> str:
     """
     Encrypt raw image bytes with AES-128 Fernet and save to cloud blob storage
@@ -71,6 +67,24 @@ def get_decrypted_rx(filename: str) -> bytes:
         raise FileNotFoundError(f"Prescription file not found: {filename}")
     with open(in_path, "rb") as f:
         return decrypt_bytes(f.read())
+
+
+def rx_exists(filename: str | None) -> bool:
+    """True if the encrypted prescription is on disk or in cloud storage."""
+    if not filename:
+        return False
+    if AZURE_STORAGE_CONNECTION_STRING:
+        try:
+            from azure.storage.blob import BlobServiceClient
+            blob_service = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+            blob_client = blob_service.get_blob_client(
+                container=AZURE_STORAGE_CONTAINER, blob=filename
+            )
+            if blob_client.exists():
+                return True
+        except Exception as e:
+            logger.warning(f"Azure Blob lookup failed ({e}). Checking local disk.")
+    return os.path.exists(os.path.join(_get_store_dir(), filename))
 
 
 def delete_rx(filename: str) -> bool:

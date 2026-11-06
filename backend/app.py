@@ -2,18 +2,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-# Core & Database
-from core.config import BASE_DIR, DB, FKEY, SECRET, STORE, AREAS, CORS_ORIGINS
-from core.security import (
-    auth, check_consent, check_minor_guardian_consent, check_rate_limit,
-    need, record_failed_login, reset_failed_login, tok
-)
-from database.session import db, ensure_schema, ex, log, q, SCHEMA
+from core.config import CORS_ORIGINS
 from database.seed import init, seed_images
-from services.catalog import MEDS, match_medicine as match
-from services.ocr import DEMOS, demo_png, extract
-from services.routing import settle
-from services.notifications import notify
 
 # Routers
 from routers.auth import router as auth_router

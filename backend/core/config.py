@@ -1,7 +1,6 @@
 import base64
 import hashlib
 import os
-import secrets
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -30,14 +29,12 @@ FKEY = os.getenv("RX_ENC_KEY") or base64.urlsafe_b64encode(
 STORE = os.getenv("RX_STORE_PATH", os.path.join(BASE_DIR, "rx_store"))
 os.makedirs(STORE, exist_ok=True)
 
-# Cloud Storage Configuration (Azure Blob / S3)
+# Cloud storage for prescriptions (Azure Blob). Without it, files are encrypted on local disk.
 AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 AZURE_STORAGE_CONTAINER = os.getenv("AZURE_STORAGE_CONTAINER", "prescriptions")
-AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
 
-# Payment Gateway Configuration (Razorpay)
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "rzp_test_refillcare_demo")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET") or secrets.token_hex(32)
+# The public demo needs a one-click reset. Set DEMO_MODE=false for a real deployment.
+DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() in ("1", "true", "yes")
 
 AREAS = {
     "Park Street": (22.5535, 88.3520),

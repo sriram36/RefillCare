@@ -1,3 +1,6 @@
+"""The payment is a dummy: it only exists so the screen has something to press. There is no gateway,
+no keys and no callback. What still matters is that only the owner can mark their own order paid."""
+
 import os
 import sys
 import tempfile
@@ -10,59 +13,53 @@ init()
 
 from fastapi.testclient import TestClient
 import app as A
-from services import payments
+from database.session import q
 
 c = TestClient(A.app)
+
 
 def H(phone: str) -> dict:
     res = c.post("/api/login", json={"phone": phone, "otp": "123456"})
     return {"Authorization": res.json()["token"]}
 
-def test_razorpay_payment_flow():
-    cu = H("9000000001")
 
-    # 1. Create payment order for order RX-50211
+def order(code: str) -> dict:
+    return q("select paid, payment, payment_ref from orders where code = ?", code, one=True)
+
+
+def test_owner_can_pay_and_gets_a_made_up_reference():
+    cu = H("9000000001")
+    assert order("RX-50211")["paid"] == 0
     res = c.post("/api/orders/RX-50211/pay", headers=cu)
     assert res.status_code == 200
-    data = res.json()
-    assert "razorpay_order_id" in data
-    assert data["amount"] > 0
-    assert data["currency"] == "INR"
-
-    # 2. Verify signature verification utility
-    sig = payments.generate_test_signature(data["razorpay_order_id"], "pay_test_9999")
-    valid = payments.verify_payment_signature(data["razorpay_order_id"], "pay_test_9999", sig)
-    assert valid is True
-
-    # 3. Simulate webhook payment capture
-    hook_res = c.post(
-        "/api/payments/webhook",
-        json={
-            "event": "payment.captured",
-            "payload": {
-                "payment": {
-                    "entity": {
-                        "id": "pay_test_9999",
-                        "order_id": data["razorpay_order_id"],
-                        "amount": data["amount"],
-                        "status": "captured",
-                        "notes": {"order_code": "RX-50211"}
-                    }
-                }
-            }
-        }
-    )
-    assert hook_res.status_code == 200
-    assert hook_res.json()["status"] == "ok"
+    body = res.json()
+    assert body["paid"] is True and body["amount_rupees"] == 4 * 120
+    assert body["reference"].startswith("DEMO")
+    o = order("RX-50211")
+    assert o["paid"] == 1 and o["payment"] == "upi_test" and o["payment_ref"] == body["reference"]
 
 
-def test_razorpay_secret_fallback_random():
+def test_paying_twice_is_refused():
+    cu = H("9000000001")
+    assert c.post("/api/orders/RX-50211/pay", headers=cu).status_code == 409
+
+
+def test_nobody_else_can_mark_my_order_paid():
+    assert c.post("/api/orders/RX-50214/pay", headers=H("9000000001")).status_code == 403  # Debasish, Rina's order
+    assert c.post("/api/orders/NOPE/pay", headers=H("9000000001")).status_code == 404
+    assert c.post("/api/orders/RX-50214/pay", headers=H("9000000099")).status_code == 403  # pharmacist is not a customer
+    assert order("RX-50214")["paid"] == 0
+
+
+def test_an_order_on_hold_cannot_be_paid_yet():
+    assert c.post("/api/orders/RX-50219/pay", headers=H("9000000003")).status_code == 409
+
+
+def test_there_is_no_gateway_left_to_attack():
+    # the signed-callback endpoint and its keys are gone, so a stray POST cannot mark anything paid
+    res = c.post("/api/payments/webhook", json={"event": "payment.captured"})
+    assert res.status_code in (404, 405)
+    assert order("RX-50214")["paid"] == 0
     from core import config
-    assert isinstance(config.RAZORPAY_KEY_SECRET, str)
-    assert len(config.RAZORPAY_KEY_SECRET) >= 32
-    assert config.RAZORPAY_KEY_SECRET != "refillcare_secret_demo"
-
-    sig = payments.generate_test_signature("order_test_abc", "pay_test_xyz")
-    assert payments.verify_payment_signature("order_test_abc", "pay_test_xyz", sig) is True
-    assert payments.verify_payment_signature("order_test_abc", "pay_test_xyz", "invalid_sig") is False
-
+    assert not hasattr(config, "RAZORPAY_KEY_SECRET")
+    assert not hasattr(config, "RAZORPAY_WEBHOOK_SECRET")

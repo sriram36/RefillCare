@@ -1,7 +1,10 @@
 """Pure business rules: no DB, easy to test. Rules are config (brief: online-pharmacy rules not final)."""
 
+import json
 import math
+import os
 import re
+from datetime import date, timedelta
 
 # ASSUMPTION: The brief provides no prescription validity period; 180 days is assumed for chronic refills.
 RX_VALID_DAYS = 180
@@ -13,6 +16,54 @@ RULES = {
     "X": {"rx": True, "blocked": True},
     "NARC": {"rx": True, "blocked": True},
 }
+
+# Online-pharmacy rules are not final (brief), so they live in data/rules.json.
+# A bad file stops start-up: a safety gate must never loosen silently.
+RULES_FILE = os.getenv(
+    "RULES_FILE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "rules.json"),
+)
+
+
+def load_rules(path: str = RULES_FILE) -> None:
+    global RX_VALID_DAYS
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            cfg = json.load(f)
+        days = cfg.get("rx_valid_days", RX_VALID_DAYS)
+        schedules = cfg.get("schedules", {})
+        if not isinstance(days, int) or days < 1:
+            raise ValueError("rx_valid_days must be a positive whole number")
+        for name, flags in schedules.items():
+            if not (isinstance(flags, dict) and isinstance(flags.get("rx"), bool) and isinstance(flags.get("blocked"), bool)):
+                raise ValueError(f"schedule {name}: needs boolean 'rx' and 'blocked'")
+    except (OSError, ValueError) as e:
+        raise RuntimeError(f"Invalid rules file {path}: {e}") from e
+    RX_VALID_DAYS = days
+    RULES.update({k: {"rx": v["rx"], "blocked": v["blocked"]} for k, v in schedules.items()})
+
+
+load_rules()
+
+
+def days_left(qty: int, per_day: int, last_filled: str, today: date | None = None) -> int:
+    """Days until a refill runs out, from tablets bought, tablets taken a day and the fill date."""
+    today = today or date.today()
+    supply_days = int(qty) // max(int(per_day or 1), 1)
+    return (date.fromisoformat(last_filled) + timedelta(days=supply_days) - today).days
+
+
+def pack_size(med_name: str) -> int:
+    """Units in one pack, read from the catalogue name: 'strip of 15' -> 15."""
+    m = re.search(r"(?:strip|bottle|pack|box) of (\d+)", med_name or "", re.I)
+    return int(m.group(1)) if m else 1
+
+
+def packs_needed(units: int, med_name: str) -> int:
+    """Whole packs to cover a number of units (tablets)."""
+    return max(1, math.ceil(int(units) / pack_size(med_name)))
 
 
 def rule(schedule: str) -> dict:

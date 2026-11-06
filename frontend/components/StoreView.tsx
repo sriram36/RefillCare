@@ -1,39 +1,79 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Package, Truck, CheckCircle2, Clock, AlertTriangle, RefreshCw, FileText, ArrowRightLeft, Plus } from 'lucide-react';
-import { Language, translate } from '../lib/i18n';
+import { ArrowRightLeft, CheckCircle2, Package, Plus, RefreshCw, Truck, X } from 'lucide-react';
 import { fetchApi, postApi } from '../lib/api';
 
 interface StoreViewProps {
   user: any;
-  lang: Language;
   onToast: (msg: string) => void;
 }
 
-export default function StoreView({ user, lang, onToast }: StoreViewProps) {
+// The catalogue ids and names, matching the server. Needed only for the stock-transfer request.
+const MEDICINES = [
+  { id: 1, name: 'Metformin 500 mg' },
+  { id: 2, name: 'Telmisartan 40 mg' },
+  { id: 3, name: 'Levothyroxine 50 mcg' },
+  { id: 4, name: 'Amlodipine 5 mg' },
+  { id: 5, name: 'Glimepiride 1 mg' },
+];
+const STORES = [
+  { id: 1, name: 'Salt Lake' },
+  { id: 2, name: 'Behala' },
+  { id: 3, name: 'Howrah Maidan' },
+];
+const COURIERS = ['Store delivery staff', 'Local courier'];
+
+const btnPrimary = 'inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 text-base font-semibold text-white hover:bg-teal-800 disabled:opacity-60';
+const btnSecondary = 'inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-base font-semibold text-slate-900 hover:bg-slate-50';
+const fieldClass = 'h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-base text-slate-900 focus:border-teal-700';
+
+const STATUS_TEXT: Record<string, string> = {
+  awaiting_pharmacist: 'Waiting for the pharmacist',
+  approved: 'Ready to pack',
+  packed: 'Packed',
+  dispatched: 'Handed over',
+};
+
+function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+      <div role="dialog" aria-modal="true" aria-label={title} className="max-h-[92vh] w-full max-w-md space-y-5 overflow-y-auto rounded-2xl bg-white p-6">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-xl font-bold text-slate-900">{title}</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100">
+            <X className="h-6 w-6" aria-hidden="true" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export default function StoreView({ user, onToast }: StoreViewProps) {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Modals
   const [packModal, setPackModal] = useState<{ code: string } | null>(null);
   const [invoiceNo, setInvoiceNo] = useState('');
-
   const [dispatchModal, setDispatchModal] = useState<{ code: string } | null>(null);
-  const [courier, setCourier] = useState('Local Express Delivery');
-  const [storeTab, setStoreTab] = useState<'orders' | 'transfers'>('orders');
+  const [courier, setCourier] = useState(COURIERS[0]);
+  const [tab, setTab] = useState<'orders' | 'transfers'>('orders');
   const [transfers, setTransfers] = useState<any[]>([]);
-  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const [reqMedId, setReqMedId] = useState(1);
   const [reqQty, setReqQty] = useState(10);
-  const [fromStoreId, setFromStoreId] = useState(1);
-
-  const t = (k: string) => translate(k, lang);
+  const otherStores = STORES.filter((s) => s.id !== user?.store_id);
+  const [fromStoreId, setFromStoreId] = useState(otherStores[0]?.id || 1);
 
   const loadTransfers = async () => {
     try {
-      const data = await fetchApi('transfers');
-      setTransfers(data || []);
+      setTransfers((await fetchApi('transfers')) || []);
     } catch {
       setTransfers([]);
     }
@@ -41,11 +81,9 @@ export default function StoreView({ user, lang, onToast }: StoreViewProps) {
 
   const loadOrders = async () => {
     try {
-      setLoading(true);
-      const data = await fetchApi('orders');
-      setOrders(data);
+      setOrders(await fetchApi('orders'));
     } catch (err: any) {
-      onToast(err.message || 'Failed to load store orders');
+      onToast(err.message || 'Could not load orders.');
     } finally {
       setLoading(false);
     }
@@ -54,179 +92,141 @@ export default function StoreView({ user, lang, onToast }: StoreViewProps) {
   useEffect(() => {
     loadOrders();
     loadTransfers();
+    const timer = setInterval(loadOrders, 15000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRequestTransfer = async (e: React.FormEvent) => {
+  const requestTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await postApi('transfers/request', {
-        to_store_id: user?.store_id || 1,
+        to_store_id: user?.store_id,
         from_store_id: Number(fromStoreId),
         med_id: Number(reqMedId),
         qty: Number(reqQty),
       });
-      onToast('Stock transfer requested from Central Warehouse / store');
-      setShowTransferModal(false);
+      onToast('Transfer requested.');
+      setShowTransfer(false);
       loadTransfers();
     } catch (err: any) {
-      onToast(err.message || 'Failed to request transfer');
+      onToast(err.message || 'Could not request the transfer.');
     }
   };
 
-  const handleFulfillTransfer = async (tid: number) => {
+  const fulfilTransfer = async (id: number) => {
     try {
-      await postApi(`transfers/${tid}/fulfill`);
-      onToast('Stock transfer dispatched and inventory updated');
+      await postApi(`transfers/${id}/fulfill`);
+      onToast('Sent. Stock counts are updated.');
       loadTransfers();
-      loadOrders();
     } catch (err: any) {
-      onToast(err.message || 'Failed to fulfill transfer');
+      onToast(err.message || 'Could not send the transfer.');
     }
-  };
-
-  const handlePack = (code: string) => {
-    setPackModal({ code });
-    setInvoiceNo(`INV-${Math.floor(100000 + Math.random() * 900000)}`);
   };
 
   const submitPack = async () => {
     if (!packModal) return;
     if (!invoiceNo.trim()) {
-      onToast('Store invoice number is required to pack');
+      onToast('Enter the invoice number from your billing software.');
       return;
     }
-
     try {
       await postApi(`orders/${packModal.code}/pack`, { invoice: invoiceNo.trim() });
-      onToast(`Order ${packModal.code} packed with invoice ${invoiceNo.trim()}`);
+      onToast(`${packModal.code} packed.`);
       setPackModal(null);
       await loadOrders();
     } catch (err: any) {
-      onToast(err.message || 'Failed to pack order');
+      onToast(err.message || 'Could not pack this order.');
     }
-  };
-
-  const handleDispatch = (code: string) => {
-    setDispatchModal({ code });
-    setCourier('Local Express Delivery (Store Staff)');
   };
 
   const submitDispatch = async () => {
     if (!dispatchModal) return;
     try {
       await postApi(`orders/${dispatchModal.code}/dispatch`, { partner: courier.trim() });
-      onToast(`Order ${dispatchModal.code} handed over to ${courier.trim()}`);
+      onToast(`${dispatchModal.code} handed to ${courier.trim()}.`);
       setDispatchModal(null);
       await loadOrders();
     } catch (err: any) {
-      onToast(err.message || 'Failed to dispatch order');
+      onToast(err.message || 'Could not hand over this order.');
     }
   };
 
+  const pendingTransfers = transfers.filter((t) => t.status === 'requested').length;
+
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <Package className="w-6 h-6 text-teal-700" />
-            Store Order Fulfillment & Dispatch
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Store: <strong className="text-slate-800">{user?.store_name || user?.name || 'Local Store'}</strong> • Picking, Packing & Courier Handover
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900">Store orders</h1>
+          <p className="text-base text-slate-600">{user?.name}</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Sub-tab Pill Navigation */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => setStoreTab('orders')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                storeTab === 'orders' ? 'bg-white text-teal-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Fulfillment Queue ({orders.length})
-            </button>
-            <button
-              onClick={() => { setStoreTab('transfers'); loadTransfers(); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                storeTab === 'transfers' ? 'bg-white text-teal-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ArrowRightLeft className="w-3.5 h-3.5" />
-              Stock Transfers ({transfers.filter(t => t.status === 'requested').length})
-            </button>
+          <div role="tablist" className="inline-flex rounded-xl border border-slate-300 bg-white p-1">
+            {(
+              [
+                ['orders', `Orders (${orders.length})`],
+                ['transfers', `Stock transfers${pendingTransfers ? ` (${pendingTransfers})` : ''}`],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => {
+                  setTab(key);
+                  if (key === 'transfers') loadTransfers();
+                }}
+                className={`h-11 rounded-lg px-3 text-base font-semibold ${tab === key ? 'bg-teal-700 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-
           <button
-            onClick={() => { loadOrders(); loadTransfers(); }}
-            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-            title="Refresh"
+            onClick={() => {
+              loadOrders();
+              loadTransfers();
+            }}
+            className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            aria-label="Refresh"
           >
-            <RefreshCw className="w-5 h-5" />
+            <RefreshCw className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      {storeTab === 'transfers' ? (
-        /* Inter-Store Stock Transfers View */
+      {tab === 'transfers' ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <ArrowRightLeft className="w-5 h-5 text-teal-700" />
-                Inter-Store & Central Warehouse Requisitions
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Transfer inventory between neighborhood locations and Central Warehouse to prevent customer drop-off.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowTransferModal(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-xs transition"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Request Stock Transfer
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-base text-slate-600">Move stock between stores when one runs short.</p>
+            <button onClick={() => setShowTransfer(true)} className={`${btnSecondary} shrink-0`}>
+              <Plus className="h-5 w-5" aria-hidden="true" />
+              Request stock
             </button>
           </div>
 
           {transfers.length === 0 ? (
-            <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500">
-              No stock transfers recorded yet. Use the button above to request stock from the Central Warehouse.
-            </div>
+            <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-lg text-slate-600">No transfers yet.</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {transfers.map((tr) => (
-                <div key={tr.id} className="p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs space-y-3">
-                  <div className="flex items-start justify-between">
+                <div key={tr.id} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{tr.med_name || 'Prescription Medicine'}</h4>
-                      <span className="text-xs text-slate-500">Qty: <strong className="text-slate-800">{tr.qty} units</strong></span>
+                      <h3 className="text-lg font-bold text-slate-900">{(tr.med_name || '').split(',')[0]}</h3>
+                      <p className="text-base text-slate-600">{tr.qty} packs</p>
                     </div>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      tr.status === 'fulfilled' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800 animate-pulse'
-                    }`}>
-                      {tr.status.toUpperCase()}
+                    <span className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${tr.status === 'fulfilled' ? 'bg-slate-200 text-slate-800' : 'bg-amber-100 text-amber-900'}`}>
+                      {tr.status === 'fulfilled' ? 'Sent' : 'Requested'}
                     </span>
                   </div>
-
-                  <div className="text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">From:</span>
-                      <strong className="text-slate-700">{tr.from_store || 'Central Warehouse'}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">To:</span>
-                      <strong className="text-teal-800">{tr.to_store || 'Local Store'}</strong>
-                    </div>
-                  </div>
-
-                  {tr.status === 'requested' && (
-                    <button
-                      onClick={() => handleFulfillTransfer(tr.id)}
-                      className="w-full py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-xs transition"
-                    >
-                      Dispatch & Update Inventory
+                  <p className="text-base text-slate-700">
+                    {tr.from_store} <ArrowRightLeft className="mx-1 inline h-4 w-4" aria-hidden="true" /> {tr.to_store}
+                  </p>
+                  {tr.status === 'requested' && tr.from_store_id === user?.store_id && (
+                    <button onClick={() => fulfilTransfer(tr.id)} className={btnPrimary}>
+                      Send this stock
                     </button>
                   )}
                 </div>
@@ -235,340 +235,218 @@ export default function StoreView({ user, lang, onToast }: StoreViewProps) {
           )}
         </div>
       ) : loading && orders.length === 0 ? (
-        <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 space-y-3">
-          <div className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <div className="text-sm font-semibold text-slate-700">Loading store orders…</div>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            (Render backend cold-start may take up to 45s on first wake-up)
-          </p>
-        </div>
+        <p className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-lg text-slate-600" role="status">
+          Loading orders…
+        </p>
       ) : orders.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 flex flex-col items-center justify-center space-y-4 text-center">
-          <div className="p-4 rounded-full bg-emerald-50">
-            <CheckCircle2 className="w-8 h-8 text-emerald-500" />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900 text-base">Queue is clear — well done!</p>
-            <p className="text-sm text-slate-500 mt-1">
-              No orders are currently routed to your store.<br />
-              New orders will appear here automatically.
-            </p>
-          </div>
-          <button
-            onClick={loadOrders}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Refresh
-          </button>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white p-12 text-center">
+          <CheckCircle2 className="h-8 w-8 text-teal-700" aria-hidden="true" />
+          <p className="text-lg font-semibold text-slate-900">Nothing to pack right now.</p>
+          <p className="text-base text-slate-600">New orders appear here once a pharmacist has approved them.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {orders.map((o) => {
-            const isAwaiting = o.status === 'awaiting_pharmacist';
-            const isApproved = o.status === 'approved';
-            const isPacked = o.status === 'packed';
-            const isDispatched = o.status === 'dispatched';
-            const isOnHold = o.status === 'on_hold';
-
-            const activeItems = (o.items || []).filter((i: any) => i.status !== 'rejected');
+            const approved = o.status === 'approved';
+            const packed = o.status === 'packed';
+            const dispatched = o.status === 'dispatched';
+            const awaiting = o.status === 'awaiting_pharmacist';
+            const items = (o.items || []).filter((i: any) => i.status !== 'rejected');
 
             return (
-              <div
-                key={o.code}
-                className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between"
-              >
-                <div className="p-5 space-y-4">
-                  {/* Top Bar */}
-                  <div className="flex items-center justify-between">
+              <article key={o.code} className="flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="space-y-4 p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <span className="font-bold text-slate-900 text-base">{o.code}</span>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        For: <strong className="text-slate-700">{o.for_name}</strong>
-                      </div>
+                      <h2 className="whitespace-nowrap text-xl font-bold text-slate-900">{o.code}</h2>
+                      <p className="text-base text-slate-600">For {o.for_name}</p>
                     </div>
-
-                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                      isAwaiting
-                        ? 'bg-amber-100 text-amber-800'
-                        : isApproved
-                        ? 'bg-teal-100 text-teal-800'
-                        : isPacked
-                        ? 'bg-blue-100 text-blue-800'
-                        : isDispatched
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {o.status.replace(/_/g, ' ')}
+                    <span
+                      className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
+                        awaiting ? 'bg-amber-100 text-amber-900' : approved ? 'bg-teal-100 text-teal-900' : 'bg-slate-200 text-slate-800'
+                      }`}
+                    >
+                      {STATUS_TEXT[o.status] || o.status}
                     </span>
                   </div>
 
-                  {/* Payment Info */}
-                  <div className="text-xs p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-slate-600 flex items-center justify-between">
-                    <span>Payment Mode:</span>
-                    <strong className={o.payment === 'upi_test' ? 'text-emerald-700' : 'text-slate-800'}>
-                      {o.payment === 'upi_test' ? 'UPI (Paid Online)' : 'Cash on Delivery'}
-                    </strong>
-                  </div>
+                  <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+                    {items.length === 0 ? (
+                      <li className="p-3 text-base text-slate-500">No approved items</li>
+                    ) : (
+                      items.map((item: any) => (
+                        <li key={item.id} className="flex items-center justify-between gap-3 p-3 text-base">
+                          <span className="text-slate-900">{item.name}</span>
+                          <span className="shrink-0 rounded-lg bg-slate-100 px-2.5 py-1 font-bold text-slate-900">× {item.qty}</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
 
-                  {/* Order Items to Pick */}
-                  <div className="space-y-1.5">
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Items to Pick & Pack:
-                    </div>
-                    <div className="space-y-1 bg-slate-50/50 p-2.5 rounded-lg border border-slate-100">
-                      {activeItems.length === 0 ? (
-                        <div className="text-xs text-slate-400">No approved items</div>
-                      ) : (
-                        activeItems.map((item: any) => (
-                          <div key={item.id} className="flex items-center justify-between text-xs py-0.5">
-                            <span className="text-slate-800 font-medium">
-                              {item.name}
-                            </span>
-                            <span className="font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                              × {item.qty}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                  <p className="text-base text-slate-600">
+                    {o.payment === 'upi_test' || o.paid === 1 ? 'Paid online' : 'Collect cash on delivery'}
+                  </p>
 
-                  {/* Regulatory Hard Gate Warning */}
-                  {isAwaiting && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                      <div>
-                        <strong>Regulatory Gate Active:</strong> Schedule H/H1 item requires verification. Pharmacist approval is required before invoice or packing.
-                      </div>
-                    </div>
-                  )}
-
-                  {isOnHold && (
-                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-900">
-                      <strong>On Hold:</strong> Customer requested to upload a clearer prescription.
-                    </div>
+                  {awaiting && (
+                    <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-base text-amber-950">
+                      Locked. Prescription medicines cannot be packed until a pharmacist approves them.
+                    </p>
                   )}
                 </div>
 
-                {/* Bottom Action Footer */}
-                <div className="p-4 bg-slate-50/80 border-t border-slate-100">
-                  {isAwaiting && (
-                    <button
-                      disabled
-                      className="w-full py-2 bg-slate-200 text-slate-400 text-xs font-semibold rounded-lg cursor-not-allowed text-center"
-                    >
-                      Awaiting Pharmacist Check
+                <div className="border-t border-slate-100 bg-stone-50 p-4">
+                  {awaiting && (
+                    <button disabled className="inline-flex h-12 w-full cursor-not-allowed items-center justify-center rounded-xl bg-slate-200 text-base font-semibold text-slate-500">
+                      Waiting for the pharmacist
                     </button>
                   )}
-
-                  {isApproved && (
+                  {approved && (
                     <button
-                      onClick={() => handlePack(o.code)}
-                      className="w-full py-2 bg-teal-800 hover:bg-teal-900 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                      onClick={() => {
+                        setPackModal({ code: o.code });
+                        setInvoiceNo('');
+                      }}
+                      className={btnPrimary}
                     >
-                      <Package className="w-4 h-4" />
-                      Pack & Enter Store Invoice
+                      <Package className="h-5 w-5" aria-hidden="true" />
+                      Pack and enter invoice
                     </button>
                   )}
-
-                  {isPacked && (
+                  {packed && (
                     <button
-                      onClick={() => handleDispatch(o.code)}
-                      className="w-full py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                      onClick={() => {
+                        setDispatchModal({ code: o.code });
+                        setCourier(COURIERS[0]);
+                      }}
+                      className={btnPrimary}
                     >
-                      <Truck className="w-4 h-4" />
-                      Hand Over to Delivery Partner
+                      <Truck className="h-5 w-5" aria-hidden="true" />
+                      Hand over to delivery
                     </button>
                   )}
-
-                  {isDispatched && (
-                    <div className="text-xs text-emerald-800 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <div>
-                        <strong>Dispatched:</strong> {o.delivery_partner || 'Local Courier'}
-                        <div className="text-[11px] text-emerald-700">Invoice: {o.invoice_no || 'Recorded'}</div>
-                      </div>
-                    </div>
+                  {dispatched && (
+                    <p className="flex items-start gap-2 text-base text-slate-800">
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" aria-hidden="true" />
+                      <span>
+                        Handed to {o.delivery_partner || 'delivery'}
+                        <span className="block text-slate-600">Invoice {o.invoice_no || 'recorded'}</span>
+                      </span>
+                    </p>
                   )}
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>
       )}
 
-      {/* Stock Transfer Request Modal */}
-      {showTransferModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
-            <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-              <ArrowRightLeft className="w-5 h-5 text-teal-700" />
-              Request Inter-Store Stock Requisition
-            </h3>
-            <p className="text-xs text-slate-500">
-              When a local store is stock-constrained, request immediate stock transfer from the Central Warehouse or neighboring Kolkata stores.
-            </p>
-
-            <form onSubmit={handleRequestTransfer} className="space-y-3 pt-1">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Source Store / Hub</label>
-                <select
-                  value={fromStoreId}
-                  onChange={(e) => setFromStoreId(Number(e.target.value))}
-                  className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-teal-700"
-                >
-                  <option value={1}>Salt Lake Hub #1 (Central Stock)</option>
-                  <option value={2}>Behala Store #2</option>
-                  <option value={3}>Howrah Maidan Store #3</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Required Medicine</label>
-                <select
-                  value={reqMedId}
-                  onChange={(e) => setReqMedId(Number(e.target.value))}
-                  className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-teal-700"
-                >
-                  <option value={1}>Metformin 500 mg, strip of 15</option>
-                  <option value={2}>Telmisartan 40 mg, strip of 10</option>
-                  <option value={3}>Levothyroxine 50 mcg, bottle of 100</option>
-                  <option value={4}>Atorvastatin 10 mg, strip of 15</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Quantity Needed</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="500"
-                  value={reqQty}
-                  onChange={(e) => setReqQty(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 font-bold"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowTransferModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 text-xs font-bold bg-teal-800 hover:bg-teal-900 text-white rounded-xl shadow-xs transition"
-                >
-                  Submit Requisition
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Pack Modal */}
-      {packModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
-            <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
-              <Package className="w-5 h-5 text-teal-700" />
-              Pack Order {packModal.code}
-            </h3>
-            <p className="text-xs text-slate-600">
-              Enter the billing software invoice number for this packed order.
-            </p>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Store Invoice Number *</label>
-              <input
-                type="text"
-                value={invoiceNo}
-                onChange={(e) => setInvoiceNo(e.target.value)}
-                placeholder="e.g. INV-84920"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-700"
-              />
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                onClick={() => setPackModal(null)}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={submitPack}
-                className="px-4 py-2 text-sm font-semibold bg-teal-800 hover:bg-teal-900 text-white rounded-lg shadow-sm transition-colors"
-              >
-                Confirm Packed
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Dispatch Modal */}
-      {dispatchModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
-            <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
-              <Truck className="w-5 h-5 text-blue-700" />
-              Hand Over to Delivery Partner
-            </h3>
-            <p className="text-xs text-slate-600">
-              Confirm courier or store delivery executive dispatching order {dispatchModal.code}.
-            </p>
+      {showTransfer && (
+        <Modal title="Request stock" onClose={() => setShowTransfer(false)}>
+          <form onSubmit={requestTransfer} className="space-y-4">
             <div className="space-y-2">
-              <label className="block text-xs font-semibold text-slate-700">Courier / Delivery Partner *</label>
-              <input
-                type="text"
-                value={courier}
-                onChange={(e) => setCourier(e.target.value)}
-                placeholder="Courier name"
-                className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700"
-              />
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {[
-                  'Store Staff Express',
-                  'Bluedart Healthcare',
-                  'Local Courier',
-                  'Shadowfax Express'
-                ].map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setCourier(p)}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
-                      courier === p
-                        ? 'bg-blue-50 border-blue-300 text-blue-800 font-bold'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {p}
-                  </button>
+              <label htmlFor="t-from" className="block text-base font-semibold text-slate-800">
+                Ask this store
+              </label>
+              <select id="t-from" value={fromStoreId} onChange={(e) => setFromStoreId(Number(e.target.value))} className={fieldClass}>
+                {otherStores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                onClick={() => setDispatchModal(null)}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-              >
+            <div className="space-y-2">
+              <label htmlFor="t-med" className="block text-base font-semibold text-slate-800">
+                Medicine
+              </label>
+              <select id="t-med" value={reqMedId} onChange={(e) => setReqMedId(Number(e.target.value))} className={fieldClass}>
+                {MEDICINES.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="t-qty" className="block text-base font-semibold text-slate-800">
+                Packs needed
+              </label>
+              <input
+                id="t-qty"
+                type="number"
+                min={1}
+                max={500}
+                value={reqQty}
+                onChange={(e) => setReqQty(Math.max(1, parseInt(e.target.value) || 1))}
+                className={fieldClass}
+              />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button type="button" onClick={() => setShowTransfer(false)} className={btnSecondary}>
                 Cancel
               </button>
-              <button
-                onClick={submitDispatch}
-                className="px-4 py-2 text-sm font-semibold bg-blue-700 hover:bg-blue-800 text-white rounded-lg shadow-sm transition-colors"
-              >
-                Confirm Dispatch
+              <button type="submit" className={btnPrimary}>
+                Send request
               </button>
             </div>
-          </div>
-        </div>
+          </form>
+        </Modal>
       )}
 
+      {packModal && (
+        <Modal title={`Pack ${packModal.code}`} onClose={() => setPackModal(null)}>
+          <p className="text-base text-slate-700">Type the invoice number from your billing software.</p>
+          <div className="space-y-2">
+            <label htmlFor="inv" className="block text-base font-semibold text-slate-800">
+              Store invoice number
+            </label>
+            <input id="inv" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="e.g. INV-84920" autoFocus className={fieldClass} />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button onClick={() => setPackModal(null)} className={btnSecondary}>
+              Cancel
+            </button>
+            <button onClick={submitPack} className={btnPrimary}>
+              Confirm packed
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {dispatchModal && (
+        <Modal title="Hand over to delivery" onClose={() => setDispatchModal(null)}>
+          <p className="text-base text-slate-700">Who is taking {dispatchModal.code}?</p>
+          <div className="space-y-2">
+            <label htmlFor="courier" className="block text-base font-semibold text-slate-800">
+              Delivery partner
+            </label>
+            <input id="courier" value={courier} onChange={(e) => setCourier(e.target.value)} className={fieldClass} />
+            <div className="flex flex-wrap gap-2 pt-1">
+              {COURIERS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setCourier(p)}
+                  aria-pressed={courier === p}
+                  className={`min-h-[2.75rem] rounded-lg border px-3 text-base font-medium ${
+                    courier === p ? 'border-teal-700 bg-teal-50 text-teal-900 ring-2 ring-teal-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button onClick={() => setDispatchModal(null)} className={btnSecondary}>
+              Cancel
+            </button>
+            <button onClick={submitDispatch} className={btnPrimary}>
+              Confirm handover
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

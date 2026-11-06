@@ -1,10 +1,23 @@
+# Used when building the root Dockerfile (the Render deployment), where the context is the whole repo.
+# Patterns use **/ so they also match the nested backend/ files.
 .git
-*.db
-rx_store
-__pycache__
-.env*
-.venv
-frontend/node_modules/
-frontend/.next/
-docs/
-node_modules/
+**/.env
+**/.env.*
+!**/.env.example
+**/*.db
+**/*.db-*
+**/rx_store
+**/__pycache__
+**/*.pyc
+**/.venv
+**/.pytest_cache
+**/node_modules
+**/.next
+backend/tests
+frontend
+e2e
+docs
+screenshots
+scratch
+*.zip
+*.pdf

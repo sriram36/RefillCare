@@ -8,10 +8,9 @@ from core.security import (
 )
 from database.session import ex, log, q
 from rules import rule
-from services.catalog import match_medicine
 from services.ocr import demo_png, extract
+from services.orderflow import add_item, ingest_ocr_lines, insert_order
 from services.routing import settle
-from services.payments import create_payment_order, verify_payment_signature
 
 router = APIRouter(prefix="/api", tags=["Orders & Cart"])
 
@@ -45,6 +44,36 @@ def full_order(o: dict) -> dict:
     return o
 
 
+def own_order(code: str, u: dict) -> dict:
+    """Fetch an order that belongs to the signed-in customer, or fail."""
+    o = q("select * from orders where code = ?", code, one=True)
+    if not o:
+        raise HTTPException(404, "Order not found")
+    if o["customer_id"] != u["id"]:
+        raise HTTPException(403, "Not your order")
+    return o
+
+
+async def read_rx_upload(file: UploadFile | None, demo: str) -> bytes:
+    raw = await file.read() if file else demo_png(demo)
+    if not raw:
+        raise HTTPException(400, "Add a prescription photo or pick a demo prescription")
+    if len(raw) > 5_000_000:
+        raise HTTPException(413, "File is too large (max 5 MB)")
+    if not (raw[:4] == b"\x89PNG" or raw[:3] == b"\xff\xd8\xff"):
+        raise HTTPException(415, "Upload a PNG or JPEG photo")
+    return raw
+
+
+def read_result(res: dict) -> tuple[str, str]:
+    """Order status and note from the AI reading. The AI only drafts: unreadable means ask again."""
+    if res["legible"] is False:
+        return "on_hold", "Prescription not readable. Please upload a clearer photo."
+    if res["legible"] is None:
+        return "awaiting_pharmacist", "Automatic reading unavailable. Pharmacist will read it manually."
+    return "awaiting_pharmacist", ""
+
+
 @router.get("/orders")
 def get_orders(u=Depends(auth)):
     if u["role"] == "customer":
@@ -75,13 +104,7 @@ async def new_order(
     check_consent(u)
     check_minor_guardian_consent(u, for_name)
 
-    raw = await file.read() if file else demo_png(demo)
-    if not raw:
-        raise HTTPException(400, "Add a prescription photo or pick a demo prescription")
-    if len(raw) > 5_000_000:
-        raise HTTPException(413, "File is too large (max 5 MB)")
-    if not (raw[:4] == b"\x89PNG" or raw[:3] == b"\xff\xd8\xff"):
-        raise HTTPException(415, "Upload a PNG or JPEG photo")
+    raw = await read_rx_upload(file, demo)
 
     if not q(
         "select 1 x from profiles where customer_id = ? and name = ?",
@@ -94,108 +117,28 @@ async def new_order(
     if payment not in ("cod", "upi_test") or area not in AREAS:
         raise HTTPException(422, "Choose a valid payment method and delivery area")
 
-    order_count = q("select count(*) n from orders", one=True)["n"]
-    code = f"RX-{50220 + order_count}"
-    save_encrypted_rx(f"{code}.enc", raw)
-
     res = extract(raw, demo)
-    note = ""
-    status = "awaiting_pharmacist"
-    if res["legible"] is False:
-        status, note = "on_hold", "Prescription not readable. Please upload a clearer photo."
-    elif res["legible"] is None:
-        note = "Automatic reading unavailable. Pharmacist will read it manually."
-
-    ex(
-        "insert into orders(code, customer_id, for_name, status, store_id, rx_file, note, created) values(?, ?, ?, ?, ?, ?, ?, ?)",
-        code,
+    status, note = read_result(res)
+    code = insert_order(
         u["id"],
         for_name.strip()[:60] or u["name"],
         status,
-        None,
-        f"{code}.enc",
-        note,
-        int(time.time()),
+        note=note,
+        area=area,
+        payment=payment,
+        paid=1 if payment == "upi_test" else 0,
+        payment_ref=f"UTR{int(time.time() * 1000) % 10000000000:010d}" if payment == "upi_test" else None,
+        rx_file="{code}.enc",
     )
-    payment_ref = f"UTR{int(time.time() * 1000) % 10000000000:010d}" if payment == "upi_test" else None
-    ex(
-        "update orders set payment = ?, paid = ?, area = ?, payment_ref = ? where code = ?",
-        payment,
-        1 if payment == "upi_test" else 0,
-        area,
-        payment_ref,
-        code,
-    )
+    try:
+        save_encrypted_rx(f"{code}.enc", raw)
+    except Exception:
+        ex("delete from orders where code = ?", code)  # no order without its prescription
+        raise
 
-    for l in res["lines"]:
-        m, ratio = match_medicine(l["text"])
-        conf = round(min(l["conf"], ratio), 2)
-        sched = m["schedule"] if m else "H"
-        if m and rule(sched)["blocked"]:
-            ex(
-                "insert into items(order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                code,
-                m["id"],
-                m["name"],
-                sched,
-                1,
-                0,
-                conf,
-                "rejected",
-                None,
-                "Cannot be sold online",
-            )
-            continue
-
-        raw_qty = "".join(filter(str.isdigit, str(l.get("qty", 1)))) or "1"
-        parsed_qty = max(1, min(int(raw_qty), 50))
-        ex(
-            "insert into items(order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            code,
-            m["id"] if m else None,
-            m["name"] if m else l["text"] + " (not in catalog)",
-            sched,
-            parsed_qty,
-            m["price"] if m else 0,
-            conf,
-            "draft",
-            None,
-            "",
-        )
-
+    ingest_ocr_lines(code, res["lines"])
     log(u["name"], "upload_rx", code)
     return {"code": code}
-
-
-@router.post("/orders/{code}/consent-generic")
-def consent_generic(code: str, b: dict, u=Depends(auth)):
-    need(u, "customer")
-    check_consent(u)
-    item_id = b.get("item_id")
-    accepted = bool(b.get("accepted"))
-    item = q("select * from items where id = ? and order_code = ?", item_id, code, one=True)
-    if not item or not item.get("offer"):
-        raise HTTPException(404, "No generic offer found for this item")
-
-    if accepted:
-        generic_med = q("select * from meds where id = ?", item["offer"], one=True)
-        if not generic_med:
-            raise HTTPException(404, "Generic medicine record missing")
-        original_p = item.get("original_price") or item["price"]
-        ex(
-            "update items set med_id = ?, name = ?, price = ?, consent = 1, original_price = ? where id = ?",
-            generic_med["id"],
-            generic_med["name"],
-            generic_med["price"],
-            original_p,
-            item_id,
-        )
-        log(u["name"], "accept_generic", f"{code}:item-{item_id}")
-    else:
-        ex("update items set consent = 0 where id = ?", item_id)
-        log(u["name"], "decline_generic", f"{code}:item-{item_id}")
-
-    return {"status": "ok", "accepted": accepted}
 
 
 @router.post("/orders/{code}/reupload")
@@ -207,33 +150,16 @@ async def reupload_rx(
 ):
     need(u, "customer")
     check_consent(u)
-    o = q("select * from orders where code = ?", code, one=True)
-    if not o:
-        raise HTTPException(404, "Order not found")
-    if o["customer_id"] != u["id"]:
-        raise HTTPException(403, "Not your order")
+    o = own_order(code, u)
     if o["status"] != "on_hold":
         raise HTTPException(409, "Order is not on hold")
 
-    raw = await file.read() if file else demo_png(demo)
-    if not raw:
-        raise HTTPException(400, "Add a prescription photo or pick a demo prescription")
-    if len(raw) > 5_000_000:
-        raise HTTPException(413, "File is too large (max 5 MB)")
-    if not (raw[:4] == b"\x89PNG" or raw[:3] == b"\xff\xd8\xff"):
-        raise HTTPException(415, "Upload a PNG or JPEG photo")
-
+    raw = await read_rx_upload(file, demo)
     save_encrypted_rx(f"{code}.enc", raw)
     ex("delete from items where order_code = ?", code)
 
     res = extract(raw, demo)
-    note = ""
-    status = "awaiting_pharmacist"
-    if res["legible"] is False:
-        status, note = "on_hold", "Prescription not readable. Please upload a clearer photo."
-    elif res["legible"] is None:
-        note = "Automatic reading unavailable. Pharmacist will read it manually."
-
+    status, note = read_result(res)
     ex(
         "update orders set status = ?, rx_file = ?, note = ? where code = ?",
         status,
@@ -241,43 +167,7 @@ async def reupload_rx(
         note,
         code,
     )
-
-    for l in res["lines"]:
-        m, ratio = match_medicine(l["text"])
-        conf = round(min(l["conf"], ratio), 2)
-        sched = m["schedule"] if m else "H"
-        if m and rule(sched)["blocked"]:
-            ex(
-                "insert into items(order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                code,
-                m["id"],
-                m["name"],
-                sched,
-                1,
-                0,
-                conf,
-                "rejected",
-                None,
-                "Cannot be sold online",
-            )
-            continue
-
-        raw_qty = "".join(filter(str.isdigit, str(l.get("qty", 1)))) or "1"
-        parsed_qty = max(1, min(int(raw_qty), 50))
-        ex(
-            "insert into items(order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            code,
-            m["id"] if m else None,
-            m["name"] if m else l["text"] + " (not in catalog)",
-            sched,
-            parsed_qty,
-            m["price"] if m else 0,
-            conf,
-            "draft",
-            None,
-            "",
-        )
-
+    ingest_ocr_lines(code, res["lines"])
     log(u["name"], "reupload_rx", code)
     return {"ok": True, "status": status}
 
@@ -329,44 +219,17 @@ def order_cart(b: CartOrder, u=Depends(auth)):
             raise HTTPException(422, "Quantity must be 1 to 20")
         picked.append((m, line.qty))
 
-    order_count = q("select count(*) n from orders", one=True)["n"]
-    code = f"RX-{50220 + order_count}"
-
-    ex(
-        "insert into orders(code, customer_id, for_name, status, store_id, rx_file, note, created) values(?, ?, ?, ?, ?, ?, ?, ?)",
-        code,
+    code = insert_order(
         u["id"],
         b.for_name.strip(),
         "approved",
-        None,
-        None,
-        "",
-        int(time.time()),
+        area=b.area,
+        payment=b.payment,
+        paid=1 if b.payment == "upi_test" else 0,
+        payment_ref=f"UTR{int(time.time() * 1000) % 10000000000:010d}" if b.payment == "upi_test" else None,
     )
-    payment_ref = f"UTR{int(time.time() * 1000) % 10000000000:010d}" if b.payment == "upi_test" else None
-    ex(
-        "update orders set payment = ?, paid = ?, area = ?, payment_ref = ? where code = ?",
-        b.payment,
-        1 if b.payment == "upi_test" else 0,
-        b.area,
-        payment_ref,
-        code,
-    )
-
     for m, qty in picked:
-        ex(
-            "insert into items(order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            code,
-            m["id"],
-            m["name"],
-            m["schedule"],
-            qty,
-            m["price"],
-            1.0,
-            "approved",
-            None,
-            "",
-        )
+        add_item(code, m, m["name"], qty, 1.0, "approved")
 
     settle(code)
     # no pharmacist step, so it stays out of verification times:
@@ -376,49 +239,26 @@ def order_cart(b: CartOrder, u=Depends(auth)):
     return {"code": code}
 
 
+def payable_total(code: str) -> int:
+    items = q("select price, qty from items where order_code = ? and status != 'rejected'", code)
+    return sum(i["price"] * i["qty"] for i in items)
+
+
 @router.post("/orders/{code}/pay")
-def initiate_payment(code: str, u=Depends(auth)):
+def pay_demo(code: str, u=Depends(auth)):
+    """A dummy payment, for the screen only. There is no gateway: no keys, no callback, no money.
+    It marks the customer's own order as paid and gives back a made-up reference."""
     need(u, "customer")
-    o = q("select * from orders where code = ?", code, one=True)
-    if not o:
-        raise HTTPException(404, "Order not found")
-    items = q("select * from items where order_code = ? and status != 'rejected'", code)
-    total_amount = sum(i["price"] * i["qty"] for i in items) or 120
+    o = own_order(code, u)
+    if o["status"] in ("rejected", "on_hold"):
+        raise HTTPException(409, "This order cannot be paid yet")
+    if o["paid"] == 1:
+        raise HTTPException(409, "This order is already paid")
+    total = payable_total(code)
+    if total <= 0:
+        raise HTTPException(422, "Nothing to pay for on this order yet")
 
-    pay_data = create_payment_order(code, total_amount)
-    ex(
-        "insert into payment_orders(order_code, razorpay_order_id, amount, currency, created_at) values(?, ?, ?, ?, ?)",
-        code,
-        pay_data["razorpay_order_id"],
-        pay_data["amount"],
-        pay_data["currency"],
-        int(time.time()),
-    )
-    log(u["name"], "initiate_payment", code)
-    return pay_data
-
-
-@router.post("/payments/webhook")
-def payment_webhook(payload: dict):
-    event = payload.get("event")
-    payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
-    order_id = payment_entity.get("order_id")
-    payment_id = payment_entity.get("id")
-    order_code = payment_entity.get("notes", {}).get("order_code")
-
-    if not order_code and order_id:
-        po = q("select order_code from payment_orders where razorpay_order_id = ?", order_id, one=True)
-        if po:
-            order_code = po["order_code"]
-
-    if order_code:
-        ex(
-            "update orders set paid = 1, payment = 'upi_razorpay', payment_ref = ? where code = ?",
-            payment_id,
-            order_code,
-        )
-        if order_id:
-            ex("update payment_orders set status = 'paid' where razorpay_order_id = ?", order_id)
-        log("webhook:razorpay", f"paid:{payment_id}", order_code)
-
-    return {"status": "ok", "order_code": order_code}
+    ref = f"DEMO{int(time.time() * 1000) % 100000000:08d}"
+    ex("update orders set paid = 1, payment = 'upi_test', payment_ref = ? where code = ?", ref, code)
+    log(u["name"], "demo_payment", code)
+    return {"paid": True, "amount_rupees": total, "reference": ref}
