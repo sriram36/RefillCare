@@ -38,6 +38,13 @@ AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
 # Payment Gateway Configuration (Razorpay)
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "rzp_test_refillcare_demo")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET") or secrets.token_hex(32)
+# Real gateway callbacks are signed with this secret. Without it the webhook is closed.
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
+# "test": the server itself confirms payments for the signed-in customer (no money moves).
+PAYMENT_MODE = os.getenv("PAYMENT_MODE", "test")
+
+# The public demo needs a one-click reset. Set DEMO_MODE=false for a real deployment.
+DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() in ("1", "true", "yes")
 
 AREAS = {
     "Park Street": (22.5535, 88.3520),

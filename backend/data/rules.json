@@ -1,0 +1,11 @@
+{
+  "_note": "Online-pharmacy rules are not final. Edit here, no code change needed. 'rx' = prescription required, 'blocked' = never sold online. A malformed file stops the server on start.",
+  "rx_valid_days": 180,
+  "schedules": {
+    "OTC": { "rx": false, "blocked": false },
+    "H": { "rx": true, "blocked": false },
+    "H1": { "rx": true, "blocked": false },
+    "X": { "rx": true, "blocked": true },
+    "NARC": { "rx": true, "blocked": true }
+  }
+}

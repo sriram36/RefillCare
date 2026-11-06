@@ -73,6 +73,24 @@ def get_decrypted_rx(filename: str) -> bytes:
         return decrypt_bytes(f.read())
 
 
+def rx_exists(filename: str | None) -> bool:
+    """True if the encrypted prescription is on disk or in cloud storage."""
+    if not filename:
+        return False
+    if AZURE_STORAGE_CONNECTION_STRING:
+        try:
+            from azure.storage.blob import BlobServiceClient
+            blob_service = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+            blob_client = blob_service.get_blob_client(
+                container=AZURE_STORAGE_CONTAINER, blob=filename
+            )
+            if blob_client.exists():
+                return True
+        except Exception as e:
+            logger.warning(f"Azure Blob lookup failed ({e}). Checking local disk.")
+    return os.path.exists(os.path.join(_get_store_dir(), filename))
+
+
 def delete_rx(filename: str) -> bool:
     """
     Permanently delete encrypted prescription (for DPDP Act Right-to-Erasure compliance).
