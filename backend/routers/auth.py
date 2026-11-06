@@ -1,11 +1,14 @@
 import time
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from fastapi import HTTPException
+from core.config import DEMO_MODE
 from core.security import (
     auth, check_rate_limit, record_failed_login,
     reset_failed_login, tok, need
 )
 from database.session import ex, log, q
+from services.messages import LANGS
 
 router = APIRouter(prefix="/api", tags=["Auth & User"])
 
@@ -56,7 +59,7 @@ def give_consent(u=Depends(auth)):
     need(u, "customer")
     now = int(time.time())
     ex("update users set consent_at = ? where id = ?", now, u["id"])
-    log(u["name"], "grant_consent", str(now))
+    log(u["name"], "grant_consent", f"user-{u['id']}")
     return {"ok": True, "consent_at": now}
 
 
@@ -86,7 +89,22 @@ def export_my_data(u=Depends(auth)):
         "prescriptions": my_prescriptions,
     }
 
+class LanguageRequest(BaseModel):
+    lang: str
+
+
+@router.post("/me/language")
+def set_language(b: LanguageRequest, u=Depends(auth)):
+    """Remember the language so reminders reach the customer in it."""
+    if b.lang not in LANGS:
+        raise HTTPException(422, "Choose English, Bengali or Hindi")
+    ex("update users set lang = ? where id = ?", b.lang, u["id"])
+    return {"ok": True, "lang": b.lang}
+
+
 @router.post("/demo/reset")
 def reset_demo():
+    if not DEMO_MODE:
+        raise HTTPException(404, "Not available")
     from database.seed import reset_demo_data
     return reset_demo_data()

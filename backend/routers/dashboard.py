@@ -2,10 +2,12 @@ import csv
 import io
 import statistics
 import time
-from datetime import date, timedelta
+from datetime import date
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from core.security import auth, need
 from database.session import db, ex, log, q
+from rules import days_left, rule
+from services.messages import refill_reminder
 from services.notifications import notify
 
 router = APIRouter(prefix="/api", tags=["Operations Dashboard"])
@@ -64,9 +66,24 @@ def dashboard(u=Depends(auth)):
             "low_stock_count": sum(1 for a in low_stock_alerts if a["store_id"] == sid),
         })
 
+    # The success metric "no Schedule H/H1 item dispatched without approval", measured, not claimed:
+    # any line on a packed or dispatched order that is blocked, or needs approval and has none.
+    unapproved_dispatches = 0
+    for it in q(
+        "select i.schedule, i.status, i.approved_by from items i join orders o on o.code = i.order_code "
+        "where o.status in ('packed', 'dispatched') and i.status != 'rejected'"
+    ):
+        r = rule(it["schedule"])
+        if r["blocked"] or (r["rx"] and not (it["status"] == "approved" and it["approved_by"])):
+            unapproved_dispatches += 1
+
     return {
         "by_store": by_store,
         "rejections": rejections,
+        "unapproved_dispatches": unapproved_dispatches,
+        "awaiting_now": sum(1 for o in all_orders if o["status"] == "awaiting_pharmacist"),
+        "verified_count": len(mins),
+        "verify_target_min": 10,
         "median_verify_min": round(statistics.median(mins), 1) if mins else None,
         "register": q("select * from register order by ts desc"),
         "audit": q("select * from audit order by ts desc limit 15"),
@@ -113,28 +130,29 @@ def run_reminders(u=Depends(auth)):
     today = date.today().isoformat()
 
     for r in q(
-        "select r.*, m.name, u.phone from refills r "
+        "select r.*, m.name, u.phone, u.lang from refills r "
         "join meds m on m.id = r.med_id "
         "join users u on u.id = r.customer_id"
     ):
-        filled_date = date.fromisoformat(r["last_filled"])
-        days_supply = r["qty"] // r["per_day"]
-        left = (filled_date + timedelta(days=days_supply) - date.today()).days
+        left = days_left(r["qty"], r["per_day"], r["last_filled"])
+        # one reminder per refill per day, whatever language it was sent in
+        key = f"refill:{r['id']}"
 
         if left <= 5 and not q(
-            "select 1 x from notes where customer_id = ? and day = ? and text like ?",
+            "select 1 x from notes where customer_id = ? and day = ? and key = ?",
             r["customer_id"],
             today,
-            f"%{r['name']}%{r['for_name']}%",
+            key,
             one=True,
         ):
-            msg = f"{r['name']} for {r['for_name']} runs out in about {max(left, 0)} days. Reorder in one tap."
+            msg = refill_reminder(r.get("lang") or "en", r["name"].split(",")[0], r["for_name"], left)
             ex(
-                "insert into notes values(?, ?, ?, ?)",
+                "insert into notes(customer_id, text, ts, day, key) values(?, ?, ?, ?, ?)",
                 r["customer_id"],
                 msg,
                 int(time.time()),
                 today,
+                key,
             )
             if r.get("phone"):
                 notify(r["phone"], msg)
