@@ -26,6 +26,7 @@ const STATUS_STYLE: Record<string, string> = {
   rejected: 'bg-rose-100 text-rose-900',
 };
 
+const OTHERS_SHOWN = 6; // the rest of the past orders sit behind "Show all"
 const btnPrimary = 'inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 text-base font-semibold text-white hover:bg-teal-800 disabled:opacity-60';
 const btnSecondary = 'inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-base font-semibold text-slate-900 hover:bg-slate-50';
 const fieldClass = 'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 focus:border-teal-700';
@@ -180,6 +181,7 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
   const [holdModal, setHoldModal] = useState<{ code: string } | null>(null);
   const [holdReason, setHoldReason] = useState('Please upload a clearer photo of the prescription.');
   const [qtys, setQtys] = useState<Record<number, number>>({});
+  const [showAllOthers, setShowAllOthers] = useState(false);
 
   const loadOrders = async (selectCode?: string) => {
     try {
@@ -406,7 +408,14 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
             {others.length > 0 && (
               <section aria-label="Other orders" className="space-y-2">
                 <h2 className="text-base font-semibold text-slate-600">Other orders ({others.length})</h2>
-                <ul className="space-y-2">{others.map(queueRow)}</ul>
+                <ul className="space-y-2">
+                  {(showAllOthers ? others : others.filter((o, i) => i < OTHERS_SHOWN || o.code === selectedOrder?.code)).map(queueRow)}
+                </ul>
+                {others.length > OTHERS_SHOWN && (
+                  <button type="button" onClick={() => setShowAllOthers((v) => !v)} className={`${btnSecondary} h-11 w-full`}>
+                    {showAllOthers ? 'Show fewer' : `Show all ${others.length}`}
+                  </button>
+                )}
               </section>
             )}
           </div>

@@ -21,6 +21,18 @@ const STORES = [
   { id: 1, name: 'Salt Lake' },
   { id: 2, name: 'Behala' },
   { id: 3, name: 'Howrah Maidan' },
+  { id: 4, name: 'Garia' },
+  { id: 5, name: 'Dum Dum' },
+  { id: 6, name: 'Jadavpur' },
+  { id: 7, name: 'New Town' },
+  { id: 8, name: 'Baranagar' },
+  { id: 9, name: 'Tollygunge' },
+  { id: 10, name: 'Dhakuria' },
+  { id: 11, name: 'Santragachi' },
+  { id: 12, name: 'Belgharia' },
+  { id: 13, name: 'Rajarhat' },
+  { id: 14, name: 'Kasba' },
+  { id: 15, name: 'Thakurpukur' },
 ];
 const COURIERS = ['Store delivery staff', 'Local courier'];
 
