@@ -2,6 +2,8 @@ import time
 from core.config import AREAS
 from database.session import ex, exc, q
 from rules import route
+from services.messages import order_update
+from services.notifications import tell
 
 # Once an order is on hold or past packing, a late consent or decision must not re-route it.
 FROZEN = ("on_hold", "packed", "dispatched", "delivered")
@@ -55,6 +57,7 @@ def settle(code: str):
     live = [i for i in items if i["status"] == "approved"]
     if not live:
         ex("update orders set status = 'rejected' where code = ?", code)
+        tell_order(code, "rejected")
         return
 
     lines = [(i["med_id"], i["qty"]) for i in live]
@@ -73,6 +76,14 @@ def settle(code: str):
         note,
         code,
     )
+    tell_order(code, "approved", best_store["name"] if best_store else "")
+
+
+def tell_order(code: str, event: str, store: str = "", reason: str = ""):
+    """Tell the customer, in their language, that their order moved on."""
+    order = q("select customer_id from orders where code = ?", code, one=True)
+    if order:
+        tell(order["customer_id"], f"order:{code}:{event}", lambda lang: order_update(lang, event, code, store, reason))
 
 
 def reserve_stock(store_id: int, lines: list[tuple[int, int]]) -> str | None:

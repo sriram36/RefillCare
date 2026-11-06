@@ -8,7 +8,7 @@ from database.session import ex, log, q
 import rules
 from rules import rule
 from services.orderflow import add_item
-from services.routing import FROZEN, pick_store, settle
+from services.routing import FROZEN, pick_store, settle, tell_order
 
 router = APIRouter(prefix="/api", tags=["Pharmacist Verification"])
 
@@ -232,6 +232,7 @@ def hold(code: str, b: Hold, u=Depends(auth)):
     note = b.reason.strip()[:200] or "Please upload a clearer prescription."
     ex("update orders set status = 'on_hold', note = ? where code = ?", note, code)
     log(u["name"], "ask_reupload", code)
+    tell_order(code, "on_hold")
     return {"ok": True}
 
 

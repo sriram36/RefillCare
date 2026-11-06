@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from core.security import auth, need
 from database.session import ex, exc, log, q
 from rules import can_dispatch
-from services.routing import reserve_stock
+from services.routing import tell_order, reserve_stock
 
 router = APIRouter(prefix="/api", tags=["Store Fulfillment"])
 
@@ -43,6 +43,7 @@ def advance(code: str, frm: str, to: str, u: dict, inv: str | None = None):
         code,
     )
     log(u["name"], to, code)
+    tell_order(code, to)
     return {"ok": True}
 
 
