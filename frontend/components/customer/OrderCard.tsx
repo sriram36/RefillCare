@@ -77,12 +77,19 @@ export default function OrderCard({ order: o, lang, onToast, onChanged }: Props)
 
   return (
     <article className={`${card} space-y-5`} aria-label={o.code}>
-      <header className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <h3 className="text-xl font-bold text-slate-900">{o.code}</h3>
-        <span className="text-base text-slate-600">{t('order_for', { name: o.for_name })}</span>
+      <header className="min-w-0">
+        <h3 className="text-xl text-slate-900">
+          {(o.items || [])
+            .filter((i: any) => i.status !== 'rejected')
+            .map((i: any) => medName(i.name))
+            .join(', ') || o.code}
+        </h3>
+        <p className="mt-0.5 text-sm text-slate-500">
+          {t('order_for', { name: o.for_name })} · {o.code}
+        </p>
       </header>
 
-      <p className="text-lg text-slate-900">{statusLine}</p>
+      <p className="text-base text-slate-800">{statusLine}</p>
 
       <Timeline status={o.status} lang={lang} />
 
@@ -109,10 +116,10 @@ export default function OrderCard({ order: o, lang, onToast, onChanged }: Props)
             onChange={(e) => e.target.files?.[0] && reupload(e.target.files[0])}
           />
           <button type="button" disabled={sending} onClick={() => fileRef.current?.click()} className={btnPrimary}>
-            <Camera className="h-6 w-6" aria-hidden="true" />
+            <Camera className="h-5 w-5" aria-hidden="true" />
             {sending ? t('sending') : t('upload_new')}
           </button>
-          <details className="text-base text-slate-700">
+          <details className="text-sm text-slate-700">
             <summary className="cursor-pointer font-medium">{t('sample_title')}</summary>
             <div className="mt-2 flex flex-wrap gap-2">
               {[
@@ -124,7 +131,7 @@ export default function OrderCard({ order: o, lang, onToast, onChanged }: Props)
                   type="button"
                   disabled={sending}
                   onClick={() => reupload(undefined, id)}
-                  className="min-h-[2.75rem] rounded-lg border border-slate-300 bg-white px-3 font-medium hover:bg-slate-50"
+                  className="min-h-[2.5rem] rounded-lg border border-stone-300 bg-white px-3 font-medium hover:bg-stone-50"
                 >
                   {t(key)}
                 </button>
@@ -134,25 +141,25 @@ export default function OrderCard({ order: o, lang, onToast, onChanged }: Props)
         </div>
       )}
 
-      <ul className="divide-y divide-slate-100 border-t border-slate-100">
+      <ul className="divide-y divide-stone-100 border-t border-stone-100">
         {(o.items || []).map((item: any) => (
           <li key={item.id} className="space-y-3 py-3">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-lg text-slate-900">
+              <span className="text-base font-medium text-slate-900">
                 {medName(item.name)} × {item.qty}
               </span>
               {item.status === 'rejected' && (
-                <span className="text-right text-base font-medium text-rose-700">{item.reason}</span>
+                <span className="text-right text-sm font-medium text-rose-700">{item.reason}</span>
               )}
             </div>
 
             {item.offer_med && item.consent == null && (
-              <div className="space-y-3 rounded-xl border border-teal-200 bg-teal-50 p-4">
-                <p className="flex items-center gap-2 text-lg font-semibold text-teal-900">
-                  <Tag className="h-5 w-5" aria-hidden="true" />
+              <div className="space-y-3 rounded-2xl border border-teal-200 bg-teal-50 p-4">
+                <p className="flex items-center gap-2 text-base font-semibold text-teal-900">
+                  <Tag className="h-4 w-4" aria-hidden="true" />
                   {t('generic_offer_title')}
                 </p>
-                <p className="text-base text-slate-800">
+                <p className="text-sm text-slate-800">
                   {t('generic_offer_body', {
                     generic: medName(item.offer_med.name),
                     price: item.offer_med.price,
@@ -175,18 +182,22 @@ export default function OrderCard({ order: o, lang, onToast, onChanged }: Props)
       </ul>
 
       {o.total_savings > 0 && (
-        <p className="text-lg font-semibold text-teal-800">{t('savings', { n: o.total_savings })}</p>
+        <p className="text-base font-semibold text-teal-800">{t('savings', { n: o.total_savings })}</p>
       )}
 
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-base text-slate-600">
-        <span>{o.paid === 1 || o.payment === 'upi_test' ? t('paid_lbl') : t('cod')}</span>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-3 text-sm text-slate-600">
+        {o.paid === 1 || o.payment === 'upi_test' ? (
+          <span className="inline-flex items-center rounded-full bg-teal-100 px-2.5 py-0.5 font-semibold text-teal-800">{t('paid_lbl')}</span>
+        ) : (
+          <span>{t('cod')}</span>
+        )}
         {canPay && amount > 0 && (
           <button
             type="button"
             onClick={() => setShowPay(true)}
-            className="inline-flex h-12 items-center gap-2 rounded-xl border border-teal-700 px-4 text-base font-semibold text-teal-700 hover:bg-teal-50"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-teal-700 px-3.5 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-50"
           >
-            <CreditCard className="h-5 w-5" aria-hidden="true" />
+            <CreditCard className="h-4 w-4" aria-hidden="true" />
             {t('pay_online')}
           </button>
         )}
