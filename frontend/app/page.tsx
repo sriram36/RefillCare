@@ -135,15 +135,15 @@ export default function Home() {
           <>
             {user.role === 'customer' && <CustomerView user={user} lang={lang} onToast={showToast} onErased={handleLogout} />}
 
-            {user.role === 'store' && <StoreView user={user} onToast={showToast} />}
+            {user.role === 'store' && <StoreView user={user} lang={lang} onToast={showToast} />}
 
             {user.role === 'pharmacist' && (
               <div className="space-y-6">
                 <div role="tablist" className="inline-flex rounded-full bg-stone-100 p-1">
                   {(
                     [
-                      ['pharmacist', 'Verification queue'],
-                      ['dashboard', 'All stores'],
+                      ['pharmacist', t('ph_tab_queue')],
+                      ['dashboard', t('db_tab_all')],
                     ] as const
                   ).map(([key, label]) => (
                     <button
@@ -160,8 +160,8 @@ export default function Home() {
                   ))}
                 </div>
 
-                {activeTab === 'pharmacist' && <PharmacistView onToast={showToast} />}
-                {activeTab === 'dashboard' && <DashboardView onToast={showToast} onBackToQueue={() => setActiveTab('pharmacist')} />}
+                {activeTab === 'pharmacist' && <PharmacistView lang={lang} onToast={showToast} />}
+                {activeTab === 'dashboard' && <DashboardView lang={lang} onToast={showToast} onBackToQueue={() => setActiveTab('pharmacist')} />}
               </div>
             )}
           </>

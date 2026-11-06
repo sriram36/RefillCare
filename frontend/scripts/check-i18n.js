@@ -2,8 +2,9 @@
 /**
  * Keeps English, Bengali and Hindi in step.
  *
- * Fails if a key is missing in a language, if a {placeholder} differs between languages, if a customer
- * screen uses a key that is not defined, or if a Bengali/Hindi value is just the English text.
+ * Fails if a key is missing in a language, if a {placeholder} differs between languages, if a screen uses a key
+ * that is not defined, or if a Bengali/Hindi value is just the English text. The customer screens live in
+ * lib/i18n.ts and each staff screen has its own file.
  *
  *   npm run check:i18n
  */
@@ -11,18 +12,23 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const src = fs.readFileSync(path.join(root, 'lib', 'i18n.ts'), 'utf8');
+const DICTIONARY_FILES = ['i18n.ts', 'i18n_pharmacist.ts', 'i18n_store.ts', 'i18n_dashboard.ts'];
 
 const ENTRY = /^\s{4}(\w+):\s*'((?:[^'\\]|\\.)*)'/gm;
-const dict = {};
-for (const lang of ['en', 'bn', 'hi']) {
-  const start = src.indexOf(`  ${lang}: {`);
-  const end = src.indexOf('\n  },', start);
-  dict[lang] = {};
-  for (const m of src.slice(start, end).matchAll(ENTRY)) dict[lang][m[1]] = m[2];
+const dict = { en: {}, bn: {}, hi: {} };
+const problems = [];
+for (const file of DICTIONARY_FILES) {
+  const src = fs.readFileSync(path.join(root, 'lib', file), 'utf8');
+  for (const lang of ['en', 'bn', 'hi']) {
+    const start = src.indexOf(`  ${lang}: {`);
+    const end = src.indexOf('\n  },', start);
+    for (const m of src.slice(start, end).matchAll(ENTRY)) {
+      if (m[1] in dict[lang]) problems.push(`${file}: "${m[1]}" is defined twice in ${lang}`);
+      dict[lang][m[1]] = m[2];
+    }
+  }
 }
 
-const problems = [];
 const keys = Object.keys(dict.en);
 
 for (const lang of ['bn', 'hi']) {
@@ -42,12 +48,15 @@ for (const k of keys) {
   }
 }
 
-// every key a customer-facing file asks for must exist
+// every key a screen asks for must exist
 const files = [
   'components/CustomerView.tsx',
   'components/Header.tsx',
   'components/AuthModal.tsx',
   'components/Timeline.tsx',
+  'components/PharmacistView.tsx',
+  'components/StoreView.tsx',
+  'components/DashboardView.tsx',
   'app/page.tsx',
   ...fs.readdirSync(path.join(root, 'components', 'customer')).filter((f) => f.endsWith('.tsx')).map((f) => `components/customer/${f}`),
 ];
@@ -59,6 +68,8 @@ for (const f of files) {
     ...[...text.matchAll(/key:\s*'((?:area|sample|rel|cat)_\w+)'/g)].map((m) => m[1]),
     ...[...text.matchAll(/\bGROUP_KEY\b[^\n]*'(cat_restricted)'/g)].map((m) => m[1]),
     ...[...text.matchAll(/\[\s*'\w+',\s*'(sample_\w+)'\s*\]/g)].map((m) => m[1]),
+    // staff screens keep their keys in lookup tables such as STATUS_KEY = { dispatched: 'ph_status_dispatched' }
+    ...[...text.matchAll(/['"]((?:ph|st|db)_\w+)['"]/g)].map((m) => m[1]),
   ]);
   for (const k of used) if (!(k in dict.en)) problems.push(`${f}: uses "${k}", which is not defined`);
 }

@@ -1,8 +1,15 @@
 // RefillCare Trilingual Dictionaries (English, Bengali, Hindi)
+//
+// The customer screens live here. Each staff screen has its own file so it can grow without making this one huge:
+// lib/i18n_pharmacist.ts (keys ph_*), lib/i18n_store.ts (st_*) and lib/i18n_dashboard.ts (db_*).
+
+import { PHARMACIST_TEXT } from './i18n_pharmacist';
+import { STORE_TEXT } from './i18n_store';
+import { DASHBOARD_TEXT } from './i18n_dashboard';
 
 export type Language = 'en' | 'bn' | 'hi';
 
-export const DICTIONARY: Record<Language, Record<string, string>> = {
+const CUSTOMER_TEXT: Record<Language, Record<string, string>> = {
   en: {
     app_title: 'Pharmacy reorder',
     low: 'Running low',
@@ -484,6 +491,12 @@ export const DICTIONARY: Record<Language, Record<string, string>> = {
     forget_yes: 'हाँ, मेरा डेटा मिटाएँ',
     forget_done: 'आपका डेटा मिटा दिया गया है।',
   },
+};
+
+export const DICTIONARY: Record<Language, Record<string, string>> = {
+  en: { ...CUSTOMER_TEXT.en, ...PHARMACIST_TEXT.en, ...STORE_TEXT.en, ...DASHBOARD_TEXT.en },
+  bn: { ...CUSTOMER_TEXT.bn, ...PHARMACIST_TEXT.bn, ...STORE_TEXT.bn, ...DASHBOARD_TEXT.bn },
+  hi: { ...CUSTOMER_TEXT.hi, ...PHARMACIST_TEXT.hi, ...STORE_TEXT.hi, ...DASHBOARD_TEXT.hi },
 };
 
 export function translate(
