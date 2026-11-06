@@ -16,6 +16,7 @@ from database.seed import init, sync_catalog
 from database.session import SCHEMA, ex, q
 from rules import RULES
 from services.catalog import CATALOG, CATEGORIES, GENERICS
+from services.network import STORES
 
 c = TestClient(A.app)
 STOCK_CSV = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "stock.csv")
@@ -67,7 +68,7 @@ def test_starting_stock_covers_every_sellable_medicine_in_every_store_and_no_blo
     sellable = {m[0] for m in CATALOG if not RULES[m[2]]["blocked"]} | {g[0] for g in GENERICS}
     blocked = {m[0] for m in CATALOG if RULES[m[2]]["blocked"]}
     seen = {(int(r["store_id"]), int(r["med_id"])) for r in rows}
-    assert seen == {(s, m) for s in (1, 2, 3) for m in sellable}
+    assert seen == {(s, m) for s in range(1, len(STORES) + 1) for m in sellable}
     assert not any(m in blocked for _, m in seen), "Schedule X and narcotics are never stocked for sale"
     assert all(int(r["qty"]) >= 0 for r in rows)
 
@@ -75,7 +76,7 @@ def test_starting_stock_covers_every_sellable_medicine_in_every_store_and_no_blo
 def test_a_fresh_database_gets_the_whole_catalogue_with_groups():
     assert q("select count(*) n from meds", one=True)["n"] == len(CATALOG) + len(GENERICS)
     assert q("select count(*) n from meds where category is null", one=True)["n"] == 0
-    assert q("select count(*) n from stock", one=True)["n"] == 141
+    assert q("select count(*) n from stock", one=True)["n"] == len(STORES) * (len(CATALOG) + len(GENERICS) - 2)
 
 
 # ---- the safety rule must survive a bigger catalogue ----
@@ -122,8 +123,8 @@ def test_search_is_a_customer_action():
 def test_results_say_how_many_stores_have_it():
     cu = H("9000000001")
     count = lambda term: {short(m): m["stores_in_stock"] for m in find(cu, term=term)}
-    assert count("Cefixime")["Cefixime 200 mg"] == 2  # out at Behala, in stock at the other two
-    assert count("Azithro")["Azithromycin 500 mg"] == 3  # low at Howrah Maidan, but still in stock
+    assert count("Cefixime")["Cefixime 200 mg"] == len(STORES) - 1  # out at Behala, in stock everywhere else
+    assert count("Azithro")["Azithromycin 500 mg"] == len(STORES)  # low at Howrah Maidan, but still in stock
     ex("update stock set qty = 0 where med_id = 43")
     assert count("thermometer")["Digital thermometer"] == 0
 
@@ -140,7 +141,7 @@ def test_sync_adds_what_is_missing_and_never_overwrites_an_edit():
     sync_catalog()
 
     assert q("select name from meds where id = 40", one=True)["name"].startswith("Zinc 20 mg")  # the missing one is back
-    assert q("select count(*) n from stock where med_id = 40", one=True)["n"] == 3
+    assert q("select count(*) n from stock where med_id = 40", one=True)["n"] == len(STORES)
     assert q("select price from meds where id = 34", one=True)["price"] == 777  # the edit survives
     assert q("select qty from stock where store_id = 2 and med_id = 7", one=True)["qty"] == 5
     assert q("select category from meds where id = 7", one=True)["category"] == "Pain and fever"  # only a gap is filled
@@ -170,4 +171,4 @@ def test_an_old_database_is_upgraded_in_place(monkeypatch, tmp_path):
     assert len(meds) == len(CATALOG) + len(GENERICS)
     assert meds[1]["price"] == 999, "the existing medicine keeps its edited price"
     assert meds[1]["category"] == "Diabetes" and meds[7]["category"] == "Pain and fever"
-    assert q("select count(*) n from stock", one=True)["n"] == 141
+    assert q("select count(*) n from stock", one=True)["n"] == len(STORES) * (len(CATALOG) + len(GENERICS) - 2)
