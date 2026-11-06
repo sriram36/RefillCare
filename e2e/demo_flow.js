@@ -310,11 +310,23 @@ async function main() {
       await waitText(anita, 'Approved · 2 packs');
       await shot(anita, '07_schedule_x_rejected');
     });
-    await step('approve Debasish’s refill and Arif’s re-sent prescription', async () => {
+    await step('the pharmacist adds a medicine the AI did not read, from the catalogue', async () => {
+      await clickText(anita, refillCode, { selector: 'button' });
+      await waitText(anita, 'Metformin 500 mg');
+      await clickText(anita, 'Add a medicine', { selector: 'summary' });
+      await anita.waitForSelector('input[aria-label="Search the medicine list"]');
+      await anita.type('input[aria-label="Search the medicine list"]', 'Paracetamol');
+      await clickText(anita, 'Add', { exact: true });
+      await waitText(anita, 'Added by you');
+      await shot(anita, '07b_pharmacist_added_medicine');
+    });
+    await step('approve Debasish’s refill (both lines) and Arif’s re-sent prescription', async () => {
       await clickText(anita, refillCode, { selector: 'button' });
       await waitText(anita, 'Metformin 500 mg');
       await clickText(anita, 'Approve', { exact: true });
       await waitText(anita, 'Approved · 4 packs');
+      await clickText(anita, 'Approve', { exact: true }); // the line the pharmacist added still needs its own approval
+      await waitText(anita, 'Approved · 1 pack');
       await clickText(anita, 'RX-50219', { selector: 'button' });
       await waitText(anita, 'Telmisartan 40 mg');
       // the printed sample has two lines, and each one needs its own approval
