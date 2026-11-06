@@ -16,6 +16,14 @@ def verify_payment_signature(order_id: str, payment_id: str, signature: str) -> 
     return hmac.compare_digest(expected, signature)
 
 
+def verify_webhook_signature(raw_body: bytes, signature: str | None, secret: str | None) -> bool:
+    """Razorpay signs the raw webhook body with HMAC-SHA256. No secret configured means the webhook is closed."""
+    if not secret or not signature:
+        return False
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
 def create_payment_order(order_code: str, amount_in_rupees: int) -> dict:
     """Create a Razorpay / UPI payment order."""
     now = int(time.time())

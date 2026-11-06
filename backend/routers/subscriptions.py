@@ -2,9 +2,10 @@ import time
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from core.security import auth, need, check_consent
+from core.security import auth, need, check_consent, check_minor_guardian_consent
 from database.session import ex, q, log
-from rules import RX_VALID_DAYS
+from rules import rule
+from services.orderflow import create_refill_order
 
 router = APIRouter(prefix="/api/subscriptions", tags=["Subscriptions"])
 
@@ -36,9 +37,16 @@ def create_subscription(b: SubscriptionCreate, u=Depends(auth)):
     need(u, "customer")
     check_consent(u)
 
-    med = q("select * from meds where id = ?", b.med_id, one=True)
+    check_minor_guardian_consent(u, b.for_name)
+    if not q("select 1 x from profiles where customer_id = ? and name = ?", u["id"], b.for_name.strip(), one=True):
+        raise HTTPException(422, "Choose who this refill is for")
+    med = q("select * from meds where id = ? and generic_of is null", b.med_id, one=True)
     if not med:
         raise HTTPException(404, "Medicine not found")
+    if rule(med["schedule"])["blocked"]:
+        raise HTTPException(422, f"{med['name']} cannot be sold online")
+    if not (1 <= b.qty <= 365 and 1 <= b.per_day <= 10 and 7 <= b.frequency_days <= 90):
+        raise HTTPException(422, "Check the quantity, daily dose and how often (7 to 90 days)")
 
     next_date = (date.today() + timedelta(days=b.frequency_days)).isoformat()
     now = int(time.time())
@@ -80,54 +88,17 @@ def run_subscription_engine(u=Depends(auth)):
     generated = []
 
     for s in due_subs:
-        order_count = q("select count(*) n from orders", one=True)["n"]
-        code = f"RX-{50220 + order_count}"
-        now = int(time.time())
-
-        # Check prescription on file
-        rx_rec = q(
-            "select * from prescriptions where customer_id = ? and profile_name = ? and valid_until >= ? order by valid_until desc limit 1",
-            s["customer_id"],
-            s["for_name"],
-            today_str,
-            one=True,
-        )
-        rx_file = rx_rec["rx_file"] if rx_rec else None
-        status = "awaiting_pharmacist" if rx_file else "on_hold"
-        note = "Automated subscription refill order." if rx_file else "Subscription on hold: please upload updated prescription."
-
-        ex(
-            "insert into orders(code, customer_id, for_name, status, store_id, rx_file, note, created) values(?, ?, ?, ?, ?, ?, ?, ?)",
-            code,
-            s["customer_id"],
-            s["for_name"],
-            status,
-            None,
-            rx_file,
-            note,
-            now,
-        )
-
         med = q("select * from meds where id = ?", s["med_id"], one=True)
-        if med:
-            ex(
-                "insert into items(order_code, med_id, name, schedule, qty, price, conf, status, approved_by, reason) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                code,
-                med["id"],
-                med["name"],
-                med["schedule"],
-                s["qty"],
-                med["price"],
-                1.0,
-                "draft",
-                None,
-                "",
-            )
+        customer = q("select * from users where id = ?", s["customer_id"], one=True)
+        if not med or not customer:
+            continue
 
-        # Advance next_refill
+        # s["qty"] is tablets for the whole cycle, so it is turned into packs, not ordered as packs
+        order = create_refill_order(customer, s["for_name"], med, s["qty"], "Subscription refill. ")
+
         next_date = (date.today() + timedelta(days=s.get("frequency_days") or 30)).isoformat()
         ex("update subscriptions set next_refill = ? where id = ?", next_date, s["id"])
-        generated.append(code)
+        generated.append(order["code"])
 
     log(u["name"], "run_subscriptions_engine", f"generated:{len(generated)}")
     return {"generated": generated, "count": len(generated)}
