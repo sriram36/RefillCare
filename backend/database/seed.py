@@ -6,7 +6,7 @@ from cryptography.fernet import Fernet
 from core.config import BASE_DIR, DB, FKEY, STORE
 from database.session import db, ex, log, q, SCHEMA, ensure_schema
 from rules import RX_VALID_DAYS
-from services.catalog import MEDS
+from services.catalog import CATALOG, GENERICS, MEDS
 from services.ocr import demo_png
 
 
@@ -14,6 +14,7 @@ def init():
     actual_db = os.getenv("DB_PATH", DB)
     if os.path.exists(actual_db):
         ensure_schema()
+        sync_catalog()
         return
 
     connection = db()
@@ -41,14 +42,6 @@ def init():
             (3, "Arif Mondal", "Self"),
         ],
     )
-    connection.executemany("insert into meds(id, name, schedule, price) values(?, ?, ?, ?)", MEDS)
-    connection.executemany(
-        "insert into meds values(?, ?, ?, ?, ?)",
-        [
-            (10, "Metformin 500 mg (generic), strip of 15", "H", 80, 1),
-            (11, "Telmisartan 40 mg (generic), strip of 10", "H", 190, 2),
-        ],
-    )
     connection.executemany(
         "insert into stores values(?, ?, ?, ?)",
         [
@@ -57,15 +50,6 @@ def init():
             (3, "Howrah Maidan", 22.5800, 88.3250),
         ],
     )
-
-    stock_csv_path = os.path.join(BASE_DIR, "data", "stock.csv")
-    if os.path.exists(stock_csv_path):
-        with open(stock_csv_path, encoding="utf-8") as stock_file:
-            for r in csv.DictReader(stock_file):
-                connection.execute(
-                    "insert into stock values(?, ?, ?)",
-                    (int(r["store_id"]), int(r["med_id"]), int(r["qty"])),
-                )
 
     now = int(time.time())
     days_ago = lambda n: (date.today() - timedelta(days=n)).isoformat()
@@ -122,7 +106,44 @@ def init():
     connection.commit()
     connection.close()
     ensure_schema()
+    sync_catalog()
     seed_images()
+
+
+def sync_catalog():
+    """Make sure every catalogue medicine and its starting stock exist.
+
+    Safe to run on every start: it adds what is missing and fills in a missing category, but never overwrites
+    a name, a price or a stock count that someone has changed."""
+    stock_csv_path = os.path.join(BASE_DIR, "data", "stock.csv")
+    stock_rows = []
+    if os.path.exists(stock_csv_path):
+        with open(stock_csv_path, encoding="utf-8") as stock_file:
+            stock_rows = [(int(r["store_id"]), int(r["med_id"]), int(r["qty"])) for r in csv.DictReader(stock_file)]
+
+    connection = db()
+    try:
+        have = {row[0] for row in connection.execute("select id from meds")}
+        for med_id, name, schedule, price, category in CATALOG:
+            if med_id in have:
+                connection.execute("update meds set category = ? where id = ? and category is null", (category, med_id))
+            else:
+                connection.execute(
+                    "insert into meds(id, name, schedule, price, generic_of, category) values(?, ?, ?, ?, null, ?)",
+                    (med_id, name, schedule, price, category),
+                )
+        for med_id, name, schedule, price, parent, category in GENERICS:
+            if med_id in have:
+                connection.execute("update meds set category = ? where id = ? and category is null", (category, med_id))
+            else:
+                connection.execute(
+                    "insert into meds(id, name, schedule, price, generic_of, category) values(?, ?, ?, ?, ?, ?)",
+                    (med_id, name, schedule, price, parent, category),
+                )
+        connection.executemany("insert or ignore into stock values(?, ?, ?)", stock_rows)
+        connection.commit()
+    finally:
+        connection.close()
 
 
 def seed_images():
@@ -143,6 +164,7 @@ def seed_images():
 def reset_demo_data():
     """Reset dynamic transaction state back to clean initial demo seed."""
     ensure_schema()
+    sync_catalog()
     now = int(time.time())
     days_ago = lambda n: (date.today() - timedelta(days=n)).isoformat()
 

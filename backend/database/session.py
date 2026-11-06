@@ -8,7 +8,7 @@ logger = logging.getLogger("refillcare.database")
 
 SCHEMA = """
 create table users(id integer primary key, name, phone unique, role, store_id, consent_at, token_ver default 1, lang default 'en');
-create table meds(id integer primary key, name, schedule, price, generic_of);
+create table meds(id integer primary key, name, schedule, price, generic_of, category);
 create table stores(id integer primary key, name, lat, lng);
 create table stock(store_id, med_id, qty, primary key(store_id, med_id));
 create table orders(code primary key, customer_id, for_name, status, store_id, rx_file, note, created, verified_at, invoice_no, payment default 'cod', paid default 0, area default 'Park Street', payment_ref, delivery_partner, rx_reused default 0);
@@ -153,6 +153,7 @@ def ensure_schema():
         ("original_price", "alter table items add column original_price integer"),
         ("rx_reused", "alter table orders add column rx_reused integer default 0"),
         ("lang", "alter table users add column lang text default 'en'"),
+        ("category", "alter table meds add column category text"),
         ("key", "alter table notes add column key text"),
     ]:
         try:
