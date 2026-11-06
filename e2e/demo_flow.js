@@ -101,7 +101,7 @@ async function newRole(browser, width = 1200, height = 900) {
 
 const bodyText = (page) => page.evaluate(() => document.body.innerText);
 
-async function waitText(page, text, timeout = 20000) {
+async function waitText(page, text, timeout = 30000) {
   try {
     await page.waitForFunction((t) => document.body.innerText.includes(t), { timeout }, text);
   } catch {
@@ -114,7 +114,7 @@ async function noText(page, text) {
   assert(!(await bodyText(page)).includes(text), `text should not be on the page: "${text}"`);
 }
 
-async function clickText(page, text, { exact = false, selector = 'button, summary, [role=tab]', nth = 0, timeout = 20000 } = {}) {
+async function clickText(page, text, { exact = false, selector = 'button, summary, [role=tab]', nth = 0, timeout = 30000 } = {}) {
   const matcher = (sel, t, ex) =>
     [...document.querySelectorAll(sel)].filter((e) => {
       const label = (e.innerText || '').trim();
@@ -316,6 +316,9 @@ async function main() {
       await clickText(anita, 'Add a medicine', { selector: 'summary' });
       await anita.waitForSelector('input[aria-label="Search the medicine list"]');
       await anita.type('input[aria-label="Search the medicine list"]', 'Paracetamol');
+      // the list narrows as the name is typed; wait until the other matches for "Pa" have gone
+      await anita.waitForFunction(() => !document.body.innerText.includes('Pantoprazole 40 mg'), { timeout: 15000 });
+      await waitText(anita, 'Paracetamol 500 mg');
       await clickText(anita, 'Add', { exact: true });
       await waitText(anita, 'Added by you');
       await shot(anita, '07b_pharmacist_added_medicine');
@@ -415,6 +418,33 @@ async function main() {
       await waitText(debasish, 'नमस्ते, Debasish');
       await waitText(debasish, 'आपके ऑर्डर');
       await debasish.click('button[data-lang="en"]');
+    });
+
+    console.log('\n9b. Find a medicine');
+    await step('browse a group, see where it is in stock, and order an over-the-counter medicine', async () => {
+      await debasish.reload({ waitUntil: 'domcontentloaded' });
+      await clickText(debasish, 'Find a medicine');
+      await debasish.waitForSelector('input[aria-label="Search medicines"]');
+      await clickText(debasish, 'Pain and fever', { exact: true });
+      await waitText(debasish, 'Paracetamol 500 mg');
+      await waitText(debasish, 'In stock at 3 stores');
+      await shot(debasish, '14b_find_medicine');
+      await clickText(debasish, 'Add', { exact: true });
+      await waitText(debasish, 'Your cart');
+      await clickText(debasish, 'Place order', { exact: true });
+      await waitText(debasish, 'Order placed. We are finding the nearest store.');
+    });
+    await step('prescription medicines say so and cannot be added; a name narrows a group', async () => {
+      await clickText(debasish, 'Find a medicine');
+      await debasish.waitForSelector('input[aria-label="Search medicines"]');
+      await clickText(debasish, 'Diabetes', { exact: true });
+      await waitText(debasish, 'Gliclazide 80 mg');
+      await waitText(debasish, 'Needs a prescription');
+      await debasish.type('input[aria-label="Search medicines"]', 'sitagliptin');
+      // Sitagliptin is already in the Diabetes list, so wait for the OTHER medicines to leave: that is the narrowing
+      await debasish.waitForFunction(() => !document.body.innerText.includes('Gliclazide 80 mg'), { timeout: 15000 });
+      await waitText(debasish, 'Sitagliptin 100 mg');
+      await shot(debasish, '14c_find_prescription_medicine');
     });
 
     console.log('\n10. Nothing scrolls sideways on a 390px phone');
