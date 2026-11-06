@@ -73,11 +73,15 @@ The Docker container automatically seeds the database on startup:
    - Calls `seed_images()` to generate and encrypt initial synthetic sample prescriptions (`RX-50211`, `RX-50214`, `RX-50219`).
 
 ### Running via Docker Locally
+The whole app (frontend and backend) in one command, from the repo root:
 ```bash
-# Build the Docker image
-docker build -t refillcare-backend .
+docker compose up --build
+```
+Frontend on `http://localhost:3000` (set `FRONTEND_PORT` if that port is busy), backend docs on `http://localhost:8000/docs`. Data lives in the `refillcare-data` volume; `docker compose down -v` resets it. Each service has its own `.dockerignore`, so local secrets and patient data (`.env`, `*.db`, `rx_store/`) are never copied into an image.
 
-# Run the container (bind to port 8000)
+Just the backend, the same image Render builds:
+```bash
+docker build -t refillcare-backend .
 docker run -p 8000:8000 -e APP_SECRET=your-secure-secret refillcare-backend
 ```
 

@@ -91,8 +91,12 @@ cd RefillCare
 
 docker compose up --build
 ```
-- Frontend: `http://localhost:3000`
+- Frontend: `http://localhost:3000`. If something already uses port 3000, pick another: `FRONTEND_PORT=3100 docker compose up --build` (PowerShell: `$env:FRONTEND_PORT=3100; docker compose up --build`).
 - Backend API & Interactive Docs: `http://localhost:8000/docs`
+- Sign in from the **Demo accounts** list (OTP `123456`).
+- Data is kept in a Docker volume, so it survives restarts. `docker compose down -v` wipes it and starts fresh.
+- The images are built clean: your local `.env`, `pharmacy.db` and prescription files are never copied into them.
+- The address your browser uses to reach the backend (`http://localhost:8000`) is set as a build argument in `docker-compose.yml`, because Next.js bakes it in when it builds.
 
 ---
 
