@@ -377,6 +377,8 @@ async function main() {
     await step('Rina sees it is on the way', async () => {
       await rina.reload({ waitUntil: 'domcontentloaded' });
       await waitText(rina, 'On the way with Store delivery staff.');
+      await waitText(rina, 'Order RX-50214 is on its way.'); // the app also tells her, as a message
+      await waitText(rina, 'Checked by');
       await shot(rina, '10_rina_on_the_way');
     });
 
@@ -389,12 +391,26 @@ async function main() {
       await waitText(anita, 'Rejections');
       await waitText(anita, 'Cannot be sold online');
       await waitText(anita, 'Orders by store');
+      await waitText(anita, 'Orders per day');
+      await waitText(anita, 'Messages sent');
+      await waitText(anita, 'Demo messages. Nothing leaves the app.');
       const median = await anita.evaluate(() => {
         const label = [...document.querySelectorAll('p')].find((p) => p.innerText.trim() === 'Median verification');
         return label ? label.nextElementSibling.innerText : '';
       });
       assert(/^\d/.test(median.trim()), `median verification should be a real number, got "${median}"`);
       await shot(anita, '11_dashboard');
+    });
+    await step('the staff screens switch to Bengali and Hindi too', async () => {
+      await anita.click('button[data-lang="bn"]');
+      await waitText(anita, 'সব দোকান');
+      await waitText(anita, 'যাচাইয়ের সারি');
+      await waitText(anita, 'দোকান অনুযায়ী অর্ডার');
+      await shot(anita, '11b_dashboard_bengali');
+      await anita.click('button[data-lang="hi"]');
+      await waitText(anita, 'सभी स्टोर');
+      await anita.click('button[data-lang="en"]');
+      await waitText(anita, 'Orders by store');
     });
 
     console.log('\n9. Refill reminders reach the customer, in their language');
