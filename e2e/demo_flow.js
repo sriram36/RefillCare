@@ -239,7 +239,7 @@ async function main() {
       await noText(rina, 'Reorder now');
     });
     await step('upload a sample prescription (Schedule X + paracetamol)', async () => {
-      await clickText(rina, 'Send a prescription', { exact: true });
+      await clickText(rina, 'Send a prescription');
       await waitText(rina, 'Who is this for?');
       await clickText(rina, 'No prescription handy?', { selector: 'summary' });
       await clickText(rina, 'Not sold online', { exact: true });
@@ -406,15 +406,15 @@ async function main() {
       await shot(debasish, '12_message');
     });
     await step('switching to Bengali translates the whole screen, and the choice is remembered', async () => {
-      await debasish.select('#lang', 'bn');
+      await debasish.click('button[data-lang="bn"]');
       await waitText(debasish, 'নমস্কার, Debasish');
       await waitText(debasish, 'আপনার অর্ডার');
       await waitText(debasish, 'প্রেসক্রিপশন পাঠান');
       await shot(debasish, '13_bengali');
-      await debasish.select('#lang', 'hi');
+      await debasish.click('button[data-lang="hi"]');
       await waitText(debasish, 'नमस्ते, Debasish');
       await waitText(debasish, 'आपके ऑर्डर');
-      await debasish.select('#lang', 'en');
+      await debasish.click('button[data-lang="en"]');
     });
 
     console.log('\n10. Nothing scrolls sideways on a 390px phone');

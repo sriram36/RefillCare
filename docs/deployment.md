@@ -114,6 +114,7 @@ Open `http://localhost:8000/docs` to explore the OpenAPI documentation.
 
 > [!NOTE]
 > When Azure OpenAI credentials are configured, any uploaded prescription photo is processed live by Azure OpenAI Vision (`gpt-5.6-luna`) with automatic line extraction and doctor license validation. When unconfigured, the app seamlessly runs its built-in clinical OCR parser and pharmacist manual review fallback.
+   **Check that the AI keys reached the server:** open the backend's root address (for example `https://refillcare.onrender.com/`). It shows `"ai_reading": true` when the endpoint and key are set, and `false` when they are not. It never shows the keys themselves. After changing environment variables, redeploy the service so they take effect.
 5. Click **Create Web Service**.
 6. Render builds the Docker image and starts the server on `https://refillcare.onrender.com`.
 
@@ -177,7 +178,7 @@ The sign-in screen has a phone number and OTP form (OTP `123456`). Any new 10-di
 
 ## 7. Verification & Testing
 
-### Backend tests (69)
+### Backend tests (70)
 ```bash
 cd backend
 python -m pip install -r requirements.txt

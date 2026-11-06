@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+import core.config as cfg
 from core.config import CORS_ORIGINS
 from database.seed import init, seed_images
 
@@ -59,6 +60,9 @@ def root():
     return {
         "service": "RefillCare API",
         "status": "healthy",
+        # true when the AI keys are set, so you can check a deployment without uploading a photo.
+        # It reports only yes or no, never the endpoint or the key.
+        "ai_reading": bool(cfg.AZURE_ENDPOINT and cfg.AZURE_KEY),
         "version": "1.0.0",
         "docs": "/docs",
         "endpoints": {

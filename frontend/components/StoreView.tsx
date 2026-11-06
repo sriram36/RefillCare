@@ -196,6 +196,22 @@ export default function StoreView({ user, onToast }: StoreViewProps) {
         </div>
       </div>
 
+      {tab === 'orders' && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            ['Waiting', 'awaiting_pharmacist'],
+            ['To pack', 'approved'],
+            ['Packed', 'packed'],
+            ['Handed over', 'dispatched'],
+          ].map(([label, st]) => (
+            <div key={st} className="rounded-2xl border border-stone-200 bg-white p-4">
+              <p className="text-sm text-slate-600">{label}</p>
+              <p className="mt-1 text-3xl text-slate-900">{orders.filter((o) => o.status === st).length}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {tab === 'transfers' ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">

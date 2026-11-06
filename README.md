@@ -37,7 +37,7 @@ RefillCare/
 │   │   ├── catalog.py        # Medicine catalog & generic mappings
 │   │   ├── routing.py        # Nearest-store inventory routing
 │   │   └── notifications.py  # SMS / WhatsApp dispatch logging
-│   ├── tests/                # 69 automated tests: the approval gate on every order path, stock, payments, ownership, DPDP
+│   ├── tests/                # 70 automated tests: the approval gate on every order path, stock, payments, ownership, DPDP
 │   ├── requirements.txt      # Python dependencies
 │   └── Dockerfile            # Container configuration for Render
 ├── frontend/                 # Dedicated Next.js 14 App Router client
@@ -65,7 +65,7 @@ RefillCare is organized into two decoupled services:
 
 1. **Modern Frontend (`/frontend`):**
    - **Stack:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons. Hosted on **Vercel**.
-   - **Design:** Minimal and calm: 17px base text, one primary action per screen, teal on white, large touch targets, no promotional content, and no screen that scrolls sideways at 390px. Customer screens are fully trilingual (English, বাংলা, हिन्दी); `npm run check:i18n` keeps the three dictionaries in step.
+   - **Design:** Warm and calm: sage greens on oat paper with one marigold accent, Young Serif headings and Figtree text (15px body, 48px buttons), the supply shown as a blister strip with one cell per day, and no promotional content. It fits a 390px phone with no sideways scrolling. Customer screens are fully trilingual (English, বাংলা, हिन्दी); `npm run check:i18n` keeps the three dictionaries in step.
    - **Portals:**
      - **Customer App:** a home screen led by one large **Reorder now** button for whatever is running low (&le;5 days of supply), prescription photo upload for who it is for, medicine search and cart (over-the-counter only), 4-step order tracking in plain sentences, reminder messages, the generic-consent prompt, auto-refill, and DPDP rights: download or delete your data.
      - **Pharmacist Queue:** Side-by-side sticky prescription viewer and AI draft match lines, Schedule H1 regulatory register modal, rejection with mandatory reason, and generic savings offer.
@@ -171,7 +171,7 @@ All test accounts authenticate using OTP: **`123456`**.
 ## Automated Verification & Tests
 
 ```bash
-# 1. Backend safety gate & business rule tests (69 tests)
+# 1. Backend safety gate & business rule tests (70 tests)
 cd backend
 python -m pytest tests -q
 

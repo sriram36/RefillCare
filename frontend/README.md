@@ -10,7 +10,7 @@ Dedicated modern web application for RefillCare pharmacy reorder and verificatio
 - **API Client:** Clean fetch wrapper with token authentication and DPDP Act compliance handling
 
 ## Roles & Screens
-Design rules: 17px base text, one primary action per screen, teal on white, large touch targets, nothing promotional, no sideways scrolling at 390px. Customer-facing text goes through `lib/i18n.ts` in English, Bengali and Hindi, and `npm run check:i18n` keeps the three in step.
+Design: Warm and calm: sage greens on oat paper with one marigold accent, Young Serif headings and Figtree text (15px body, 48px buttons), the supply shown as a blister strip with one cell per day, and no promotional content. It fits a 390px phone with no sideways scrolling. Customer-facing text goes through `lib/i18n.ts` in English, Bengali and Hindi, and `npm run check:i18n` keeps the three in step.
 
 1. **Customer (`CustomerView.tsx`, `components/customer/`):**
    - Home leads with whatever is running low (5 days or fewer) and one large **Reorder now** button; it becomes "already in progress" once an order is open
