@@ -68,8 +68,9 @@ The Docker container automatically seeds the database on startup:
    - Seeds sample stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Salt Lake, Behala, Howrah Maidan).
    - Seeds regular patients: **Debasish Ghosh** (diabetes / Metformin), **Rina Sen** (blood pressure / Telmisartan), and **Arif Mondal** (thyroid / Levothyroxine).
    - Seeds store staff and registered pharmacist Anita Rao.
-   - Seeds all medicines (Schedule H, Schedule H1, Generics, OTC, and restricted Schedule X/Narcotics blocklist).
-   - Seeds store inventory across the seeded stores.
+   - Seeds the medicine catalogue: 41 medicines in 12 groups (over-the-counter, Schedule H, Schedule H1, and restricted Schedule X and narcotic items that are never sold online) and 8 cheaper generics.
+   - Seeds a starting stock for every medicine at each seeded store.
+   - On every later start it adds any catalogue medicine or stock row that is missing, and never overwrites a name, a price or a stock count that someone has changed, so an existing database picks up new medicines safely.
    - Calls `seed_images()` to generate and encrypt initial synthetic sample prescriptions (`RX-50211`, `RX-50214`, `RX-50219`).
 
 ### Running via Docker Locally
@@ -178,7 +179,7 @@ The sign-in screen has a phone number and OTP form (OTP `123456`). Any new 10-di
 
 ## 7. Verification & Testing
 
-### Backend tests (70)
+### Backend tests (80)
 ```bash
 cd backend
 python -m pip install -r requirements.txt
@@ -186,7 +187,7 @@ python -m pytest tests -q
 ```
 Each test file starts from its own freshly seeded database. `tests/test_safety_gate.py` tries every way of creating an order (upload, refill, subscription, re-upload, cart, generic swap) and checks that none of them can be packed or dispatched without a pharmacist's approval, that Schedule X and narcotics are never sold, and that stock, payments and ownership cannot be bypassed.
 
-### End-to-end demo flow (30 checks)
+### End-to-end demo flow (32 checks)
 Needs Chrome (set `CHROME_PATH` if it is not in the usual place). Start the backend and the frontend, then:
 ```bash
 node e2e/demo_flow.js http://localhost:3000
