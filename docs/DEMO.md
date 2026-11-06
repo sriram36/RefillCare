@@ -48,7 +48,7 @@ A seven-minute walk-through of RefillCare, followed by a map from each line of t
 | Rules configurable, since online-pharmacy rules are not final | `backend/data/rules.json`: which schedules need a prescription, which are blocked, how long a prescription is valid | `test_rules_file_is_loaded_and_a_bad_file_stops_startup` |
 | Prescriptions encrypted and access logged (DPDP) | Encrypted at rest (`core/crypto.py`). Every opening is written to the access log, which the demo reset never deletes | `tests/test_security_dpdp.py`, `test_demo_reset_is_switchable_and_keeps_the_audit_log` |
 | Bengali, Hindi, English | `frontend/lib/i18n.ts`. All customer screens, plus reminder messages | `e2e/demo_flow.js`, and `npm run check:i18n` in `frontend/` (every key exists in all three languages) |
-| Calm, minimal, large text, a clear reorder button | 17px base text, one primary action per screen, teal on white, no promotional content | Screenshots in `screenshots/demo/`; no screen scrolls sideways at 390px |
+| Calm, minimal, a clear reorder button | The refill card leads the home screen with one large **Reorder now** button and the supply as a blister strip. Sage and oat palette, one marigold accent, 15px text, no promotional content | Screenshots in `screenshots/demo/`; no screen scrolls sideways at 390px |
 
 ## What is mocked, and what is not finished
 
