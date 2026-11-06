@@ -25,6 +25,8 @@ def dashboard(u=Depends(auth)):
     rejections: dict[str, int] = {}
 
     for o in all_orders:
+        if o["status"] == "rejected" and not o["store_id"]:
+            continue  # turned down before any store was chosen: not waiting to be routed
         name = store_names.get(o["store_id"], "Not routed")
         by_store[name] = by_store.get(name, 0) + 1
 
