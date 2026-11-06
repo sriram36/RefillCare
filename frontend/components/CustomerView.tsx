@@ -76,7 +76,7 @@ export default function CustomerView({ user, lang, onToast, onErased }: Customer
   // an open order for the same medicine and person means a second tap would only duplicate it
   const openOrderFor = (r: any) =>
     orders.find(
-      (o) => OPEN.includes(o.status) && o.for_name === r.for_name && (o.items || []).some((i: any) => i.med_id === r.med_id)
+      (o) => OPEN.includes(o.status) && o.for_name === r.for_name && (o.items || []).some((i: any) => i.med_id === r.med_id || i.med_id === r.generic_med_id)
     );
   const subFor = (r: any) => subs.find((s) => s.med_id === r.med_id && s.for_name === r.for_name);
 

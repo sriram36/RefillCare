@@ -14,8 +14,8 @@ def get_refills(u=Depends(auth)):
     need(u, "customer")
     results = []
     query = (
-        "select r.*, m.name from refills r "
-        "join meds m on m.id = r.med_id where customer_id = ?"
+        "select r.*, m.name, (select g.id from meds g where g.generic_of = r.med_id) as generic_med_id "
+        "from refills r join meds m on m.id = r.med_id where customer_id = ?"
     )
     for r in q(query, u["id"]):
         left = days_left(r["qty"], r["per_day"], r["last_filled"])
@@ -41,9 +41,11 @@ def reorder(rid: int, u=Depends(auth)):
 
     open_order = q(
         "select o.code from orders o join items i on i.order_code = o.code "
-        "where o.customer_id = ? and o.for_name = ? and i.med_id = ? "
+        "where o.customer_id = ? and o.for_name = ? "
+        # an accepted generic replaces the medicine on the order, so match that too
+        "and (i.med_id = ? or i.med_id in (select id from meds where generic_of = ?)) "
         "and o.status in ('awaiting_pharmacist', 'on_hold', 'approved') limit 1",
-        u["id"], r["for_name"], r["med_id"], one=True,
+        u["id"], r["for_name"], r["med_id"], r["med_id"], one=True,
     )
     if open_order:
         raise HTTPException(409, f"You already have this refill in progress ({open_order['code']})")

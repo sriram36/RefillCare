@@ -433,3 +433,20 @@ def test_sample_prescription_is_big_enough_to_read():
     blurry_edges = ImageStat.Stat(sheet("blurry").filter(ImageFilter.FIND_EDGES)).var[0]
     assert blurry_edges < sharp_edges / 3
     assert demo_png("not-a-sample") == b""
+
+
+def test_accepting_a_generic_does_not_open_the_door_to_a_duplicate_refill_order(people):
+    rina, ph = people["rina"], people["ph"]
+    refill = next(r for r in c.get("/api/refills", headers=rina).json() if r["name"].startswith("Telmisartan"))
+    assert refill["generic_med_id"], "the refill list should say which generic belongs to this medicine"
+
+    # RX-50214 is Rina's open Telmisartan order. Approve it, offer the generic, and she accepts.
+    approve_all("RX-50214", ph)
+    item = order_of("RX-50214", ph)["items"][0]
+    assert c.post(f"/api/items/{item['id']}/offer-generic", headers=ph).status_code == 200
+    assert c.post(f"/api/items/{item['id']}/consent", json={"accept": True}, headers=rina).status_code == 200
+    assert order_of("RX-50214", ph)["items"][0]["med_id"] == refill["generic_med_id"]  # the order now holds the generic
+
+    # the order is still open, so a second tap on the refill must still be refused
+    again = c.post(f"/api/refills/{refill['id']}/reorder", headers=rina)
+    assert again.status_code == 409 and "RX-50214" in again.json()["detail"]
