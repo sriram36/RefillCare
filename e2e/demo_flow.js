@@ -427,7 +427,7 @@ async function main() {
       await debasish.waitForSelector('input[aria-label="Search medicines"]');
       await clickText(debasish, 'Pain and fever', { exact: true });
       await waitText(debasish, 'Paracetamol 500 mg');
-      await waitText(debasish, 'In stock at 3 stores');
+      await waitText(debasish, 'In stock at 15 stores');
       await shot(debasish, '14b_find_medicine');
       await clickText(debasish, 'Add', { exact: true });
       await waitText(debasish, 'Your cart');
