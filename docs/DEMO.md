@@ -27,8 +27,8 @@ A seven-minute walk-through of RefillCare, followed by a map from each line of t
 | 12 | Behala store | Reload. **Pack and enter invoice**, type an invoice number, then **Hand over to delivery**. | Packing only became possible after approval. Stock is taken from the store's count at the moment it is packed. |
 | 13 | Rina | Reload. Press **Pay with UPI (demo)**, then **Pay**. | A UPI-style screen marked *demo*. It shows the amount and marks the order paid. Then reload: *On the way with Store delivery staff.* A four-step progress line, no horizontal scrolling on a phone. |
 | 14 | Anita | Open the **All stores** tab. | Median verification time (a real figure from the orders, under the 10-minute target), orders by store, **rejections with reasons**, low stock, the H1 register, and **Sent without approval: 0**, which is measured from the data and not a fixed label. |
-| 15 | Anita, then Debasish | **Send today's reminders**. Then sign in as Debasish. | The reminder is under *Messages*, with a one-tap reorder right below it. It is sent in the customer's own language. |
-| 16 | Anyone | Change the language (top right) to বাংলা, then हिन्दी. | Every customer screen is translated, not just the headings. |
+| 15 | Anita, then Debasish | Under *Refill reminders* note that they also go out automatically every day at 9:00 am. Press **Send today's reminders** (it says nothing new if the timer already sent them). Then sign in as Debasish. | The reminder is under *Messages*, with a one-tap reorder right below it, and the same message is listed under *Messages sent* on the dashboard with the number hidden. It is sent in the customer's own language. Order updates (approved, packed, on its way) arrive the same way. |
+| 16 | Anyone | Change the language (top right) to বাংলা, then हिन्दी. | Every screen is translated, not just the headings: the customer screens and the pharmacist, store and dashboard screens. |
 | 17 | A new customer | Sign out. Enter any new 10-digit number, the OTP, and a name. Agree to the data notice, then scroll to the bottom and press **Delete my data**. | Anyone can register. Their data can be downloaded or deleted from the home screen. Records the law requires, such as the H1 register, are kept. |
 
 ## Where each requirement lives
@@ -48,7 +48,7 @@ A seven-minute walk-through of RefillCare, followed by a map from each line of t
 | AI reads the prescription as a draft only; the pharmacist can add or correct a line; unreadable gets a re-upload request; generics need approval and consent | `backend/services/ocr.py`, `routers/orders.py`. The AI only creates *draft* lines | `e2e/demo_flow.js`, `test_generic_needs_consent_and_cannot_change_a_packed_order` |
 | Rules configurable, since online-pharmacy rules are not final | `backend/data/rules.json`: which schedules need a prescription, which are blocked, how long a prescription is valid | `test_rules_file_is_loaded_and_a_bad_file_stops_startup` |
 | Prescriptions encrypted and access logged (DPDP) | Encrypted at rest (`core/crypto.py`). Every opening is written to the access log, which the demo reset never deletes | `tests/test_security_dpdp.py`, `test_demo_reset_is_switchable_and_keeps_the_audit_log` |
-| Bengali, Hindi, English | `frontend/lib/i18n.ts`. All customer screens, plus reminder messages | `e2e/demo_flow.js`, and `npm run check:i18n` in `frontend/` (every key exists in all three languages) |
+| Bengali, Hindi, English | `frontend/lib/i18n.ts`, `i18n_pharmacist.ts`, `i18n_store.ts`, `i18n_dashboard.ts`. All screens, plus reminder and order messages | `e2e/demo_flow.js`, and `npm run check:i18n` in `frontend/` (every key exists in all three languages) |
 | Calm, minimal, a clear reorder button | The refill card leads the home screen with one large **Reorder now** button and the supply as a blister strip. Sage and oat palette, one marigold accent, 15px text, no promotional content | Screenshots in `screenshots/demo/`; no screen scrolls sideways at 390px |
 
 ## What is mocked, and what is not finished
@@ -61,7 +61,7 @@ Said plainly, so nobody finds it later:
 - **AI reading** of prescriptions is real only when an Azure OpenAI key is configured. Without one, the sample prescriptions return fixed reads, and an uploaded photo goes to the pharmacist to read by hand.
 - **Stores**: 15 are seeded, not 46. Only Salt Lake, Behala and Howrah Maidan, the three named in the brief, have staff logins. The stock CSV route handles any number of stores.
 - **Past orders**: 36 closed orders from 8 sample customers are seeded so the dashboard has figures to show. The demo reset brings them back. They are not real, and a real database never gets them.
-- **Staff screens** (pharmacist, store, dashboard) and the privacy page are in English only. The customer screens, which the brief centres on, are in all three languages.
-- **Reminders** run when a pharmacist presses the button. They are not on a timer yet.
+- **Languages**: every screen except the privacy page is in English, Bengali and Hindi. Text that comes from the server, such as a rejection reason, stays in English. The Bengali and Hindi wording has not had a native-speaker review.
+- **Reminders** go out by themselves once a day from 9:00 am India time, and the pharmacist can also press the button. They are demo messages: shown in the app, never sent as a real SMS or WhatsApp message.
 - **Routing** picks one store that has every item. If none does, the pharmacist sees which medicine is short, and stores can request a transfer from each other.
 - **PostgreSQL** is not finished. The deployment uses SQLite, which on a free Render plan resets when the service restarts.

@@ -108,6 +108,7 @@ Open `http://localhost:8000/docs` to explore the OpenAPI documentation.
    - `RX_ENC_KEY`: (optional, auto-generated from APP_SECRET if omitted)
    - `DEMO_MODE`: `true` (default) keeps the one-click **Restart demo** endpoint. **Set `false` for a real deployment**: the endpoint then returns 404.
    - `RULES_FILE`: optional path to a rules file. By default `backend/data/rules.json` sets which schedules need a prescription, which are never sold online, and how long a prescription stays valid. Edit it when the online-pharmacy rules change. A malformed file stops the server on start, so the safety gate can never loosen silently.
+   - `REMINDER_HOUR`: hour of the day (India time, default `9`) from which refill reminders go out automatically, once a day. `-1` turns the timer off. Messages are demo messages: nothing is sent.
    - `CORS_ORIGINS`: comma-separated list of allowed front-end origins. Set it to your Vercel URL in production (the default `*` is for local use).
    - `DATABASE_URL`: **leave unset.** PostgreSQL support is unfinished: the queries are translated, but the tables are only created for SQLite, so a fresh Postgres database would be empty and fail. Use the default SQLite file.
    - `AZURE_OPENAI_ENDPOINT`: `https://rag-42.openai.azure.com` (optional for live Azure Vision)
@@ -180,7 +181,7 @@ The sign-in screen has a phone number and OTP form (OTP `123456`). Any new 10-di
 
 ## 7. Verification & Testing
 
-### Backend tests (88)
+### Backend tests (95)
 ```bash
 cd backend
 python -m pip install -r requirements.txt
@@ -188,7 +189,7 @@ python -m pytest tests -q
 ```
 Each test file starts from its own freshly seeded database. `tests/test_safety_gate.py` tries every way of creating an order (upload, refill, subscription, re-upload, cart, generic swap) and checks that none of them can be packed or dispatched without a pharmacist's approval, that Schedule X and narcotics are never sold, and that stock, payments and ownership cannot be bypassed.
 
-### End-to-end demo flow (32 checks)
+### End-to-end demo flow (33 checks)
 Needs Chrome (set `CHROME_PATH` if it is not in the usual place). Start the backend and the frontend, then:
 ```bash
 node e2e/demo_flow.js http://localhost:3000

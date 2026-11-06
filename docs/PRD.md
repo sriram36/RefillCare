@@ -80,9 +80,9 @@ Company A runs a pharmacy network across Kolkata and Howrah (the client's chain 
 | C7 | Pay by cash on delivery or UPI (test mode simulation) | Built (test mode) |
 | C8 | Order tracking: 5-stage timeline, store, payment, and notes | Built |
 | C9 | Answer a generic suggestion: accept the cheaper generic or keep the original | Built |
-| C10 | Refill reminder messages inside the app and automated cron trigger | Built |
+| C10 | Refill reminder messages inside the app and an automatic daily trigger (9:00 am India time, `REMINDER_HOUR`) | Built |
 | C11 | English, Bengali and Hindi across customer touchpoints | Built (needs native speaker clinical review) |
-| C12 | Reminders by SMS or WhatsApp | Mocked (log lines via `services.notifications.notify`) |
+| C12 | Reminders by SMS or WhatsApp | Demo only: recorded in the app and in an outbox the pharmacist reads, nothing is sent (`services.notifications.notify`) |
 
 ### 6.2 Pharmacist
 
@@ -181,8 +181,8 @@ Company A runs a pharmacy network across Kolkata and Howrah (the client's chain 
 
 ## 11. Quality and Test Status
 
-- **88 automated backend tests** (`python -m pytest backend/tests -q`): the approval gate on every order path, Schedule X, routing and stock, generic consent, H1 register, role scoping and ownership, search/cart, reminders, signed payments, storage, subscriptions, transfers, the rules file, and security.
-- **End-to-end demo flow** (`node e2e/demo_flow.js <url>`): the whole story through the real screens as each person, 32 checks, including a 390px phone check that no screen scrolls sideways.
+- **95 automated backend tests** (`python -m pytest backend/tests -q`): the approval gate on every order path, Schedule X, routing and stock, generic consent, H1 register, role scoping and ownership, search/cart, reminders, signed payments, storage, subscriptions, transfers, the rules file, and security.
+- **End-to-end demo flow** (`node e2e/demo_flow.js <url>`): the whole story through the real screens as each person, 33 checks, including a 390px phone check that no screen scrolls sideways.
 - **Translation check** (`npm run check:i18n` in `frontend/`).
 
 ---

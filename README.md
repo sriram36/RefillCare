@@ -37,7 +37,7 @@ RefillCare/
 │   │   ├── catalog.py        # Medicine catalog & generic mappings
 │   │   ├── routing.py        # Nearest-store inventory routing
 │   │   └── notifications.py  # SMS / WhatsApp dispatch logging
-│   ├── tests/                # 88 automated tests: the approval gate on every order path, stock, payments, ownership, DPDP
+│   ├── tests/                # 95 automated tests: the approval gate on every order path, stock, payments, ownership, DPDP
 │   ├── requirements.txt      # Python dependencies
 │   └── Dockerfile            # Container configuration for Render
 ├── frontend/                 # Dedicated Next.js 14 App Router client
@@ -47,7 +47,7 @@ RefillCare/
 │   ├── package.json          # Node dependencies
 │   └── tailwind.config.js    # Healthcare palette & styling tokens
 ├── e2e/                      # Automated end-to-end testing
-│   └── demo_flow.js          # Walks the whole demo story through the real screens (32 checks, incl. 390px phone)
+│   └── demo_flow.js          # Walks the whole demo story through the real screens (33 checks, incl. 390px phone)
 ├── docs/                     # Technical specifications & documentation
 │   ├── PRD.md                # Product Requirements Document
 │   ├── TDD.md                # Technical Design Document
@@ -70,7 +70,7 @@ RefillCare is organized into two decoupled services:
      - **Customer App:** a home screen led by one large **Reorder now** button for whatever is running low (&le;5 days of supply), prescription photo upload for who it is for, medicine search and cart (over-the-counter only), 4-step order tracking in plain sentences, reminder messages, the generic-consent prompt, auto-refill, and DPDP rights: download or delete your data.
      - **Pharmacist Queue:** Side-by-side sticky prescription viewer and AI draft match lines, Schedule H1 regulatory register modal, rejection with mandatory reason, and generic savings offer.
      - **Store Staff Screen:** Store-scoped pick and pack workflow with hard regulatory gate preventing dispatch until pharmacist approval, invoice entry, and courier handover.
-     - **All-stores dashboard:** orders by store, median verification time against the 10-minute target, rejections with reasons, low-stock alerts (&le; 5 packs), the H1 register, daily stock CSV upload, reminders, and a measured count of items sent without approval (must be 0). The client's chain has 46 stores; this demo seeds 15, including the three named in the brief.
+     - **All-stores dashboard:** orders by store, median verification time against the 10-minute target, rejections with reasons, low-stock alerts (&le; 5 packs), the H1 register, daily stock CSV upload, an orders-per-day chart, the demo messages that were sent, refill reminders (automatic every day at 9:00 am, or on demand), and a measured count of items sent without approval (must be 0). The client's chain has 46 stores; this demo seeds 15, including the three named in the brief.
 
 2. **Backend API (`/backend`):**
    - **Stack:** FastAPI, Python 3.10+, SQLite, Fernet (AES-128-CBC with HMAC-SHA256) encryption. Hosted on **Render Web Service**. PostgreSQL support is unfinished (tables are only created for SQLite), so leave `DATABASE_URL` unset.
@@ -171,7 +171,7 @@ All test accounts authenticate using OTP: **`123456`**.
 ## Automated Verification & Tests
 
 ```bash
-# 1. Backend safety gate & business rule tests (88 tests)
+# 1. Backend safety gate & business rule tests (95 tests)
 cd backend
 python -m pytest tests -q
 
