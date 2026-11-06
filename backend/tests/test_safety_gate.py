@@ -450,3 +450,67 @@ def test_accepting_a_generic_does_not_open_the_door_to_a_duplicate_refill_order(
     # the order is still open, so a second tap on the refill must still be refused
     again = c.post(f"/api/refills/{refill['id']}/reorder", headers=rina)
     assert again.status_code == 409 and "RX-50214" in again.json()["detail"]
+
+
+# ---- the pharmacist can add a line the AI missed ----
+
+def test_pharmacist_can_add_a_line_when_the_ai_read_nothing(people):
+    ph = people["ph"]
+    # a real photo with no AI available: an order with a prescription but no lines read
+    code = insert_order(1, "Mother", "awaiting_pharmacist", note="Automatic reading unavailable. Pharmacist will read it manually.")
+    assert order_of(code, ph)["items"] == []
+
+    assert c.post(f"/api/orders/{code}/items", json={"med_id": 1, "qty": 2}, headers=ph).status_code == 200
+    item = order_of(code, ph)["items"][0]
+    assert (item["name"].startswith("Metformin"), item["schedule"], item["qty"], item["status"]) == (True, "H", 2, "draft")
+    assert item["reason"] == "Added by pharmacist"  # the screen shows this instead of an AI confidence
+
+    # it is a draft like any other line: nobody can pack it until it is approved
+    assert_blocked_everywhere(code, ph)
+    approve_all(code, ph)
+    assert order_of(code, ph)["status"] == "approved" and order_of(code, ph)["store_id"]
+
+
+def test_adding_a_line_to_an_approved_order_sends_it_back_for_checking(people):
+    cu, ph = people["debasish"], people["ph"]
+    code = upload(cu, "s50211")
+    approve_all(code, ph)
+    assert order_of(code, ph)["status"] == "approved" and order_of(code, ph)["store_id"]
+
+    assert c.post(f"/api/orders/{code}/items", json={"med_id": 7, "qty": 1}, headers=ph).status_code == 200  # paracetamol
+    o = order_of(code, ph)
+    assert o["status"] == "awaiting_pharmacist" and o["store_id"] is None
+    assert pack(code, ph).status_code in (403, 409)  # the new line is unchecked, so the whole order waits
+    approve_all(code, ph)
+    assert order_of(code, ph)["status"] == "approved"
+
+
+def test_adding_a_line_is_limited_to_pharmacists_and_safe_medicines(people):
+    cu, ph = people["debasish"], people["ph"]
+    code = insert_order(1, "Mother", "awaiting_pharmacist")
+    url = f"/api/orders/{code}/items"
+    assert c.post(url, json={"med_id": 1, "qty": 1}, headers=cu).status_code == 403            # not a customer action
+    assert c.post(url, json={"med_id": 999, "qty": 1}, headers=ph).status_code == 404          # not in the catalogue
+    assert c.post(url, json={"med_id": 10, "qty": 1}, headers=ph).status_code == 404           # a generic is offered, not added
+    assert c.post(url, json={"med_id": 8, "qty": 1}, headers=ph).status_code == 422            # Schedule X
+    assert c.post(url, json={"med_id": 9, "qty": 1}, headers=ph).status_code == 422            # narcotic
+    assert c.post(url, json={"med_id": 1, "qty": 0}, headers=ph).status_code == 422
+    assert c.post(url, json={"med_id": 1, "qty": 51}, headers=ph).status_code == 422
+    assert c.post("/api/orders/NOPE/items", json={"med_id": 1, "qty": 1}, headers=ph).status_code == 404
+    assert order_of(code, ph)["items"] == []  # none of those left anything behind
+
+
+def test_lines_cannot_be_added_once_an_order_is_on_hold_or_packed(people):
+    ph = people["ph"]
+    for status in ("on_hold", "packed", "dispatched"):
+        code = insert_order(1, "Mother", status)
+        assert c.post(f"/api/orders/{code}/items", json={"med_id": 1, "qty": 1}, headers=ph).status_code == 409, status
+
+
+def test_catalogue_search_is_for_pharmacists_and_hides_generics(people):
+    ph, cu = people["ph"], people["debasish"]
+    assert c.get("/api/medicines?term=metf", headers=cu).status_code == 403
+    names = [m["name"] for m in c.get("/api/medicines?term=metf", headers=ph).json()]
+    assert names and all(n.startswith("Metformin") and "(generic)" not in n for n in names)
+    everything = c.get("/api/medicines", headers=ph).json()
+    assert 1 < len(everything) <= 20 and all("(generic)" not in m["name"] for m in everything)

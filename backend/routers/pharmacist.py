@@ -7,6 +7,7 @@ from core.security import auth, need
 from database.session import ex, log, q
 import rules
 from rules import rule
+from services.orderflow import add_item
 from services.routing import FROZEN, pick_store, settle
 
 router = APIRouter(prefix="/api", tags=["Pharmacist Verification"])
@@ -34,6 +35,14 @@ class Decision(BaseModel):
 
 class Hold(BaseModel):
     reason: str
+
+
+class NewLine(BaseModel):
+    med_id: int
+    qty: int = 1
+
+
+MANUAL = "Added by pharmacist"  # marks a line the pharmacist typed in, as opposed to one the AI read
 
 
 @router.get("/orders/{code}/rx")
@@ -178,6 +187,37 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
 
     log(u["name"], d.action, f"item {iid}")
     settle(item["order_code"])
+    return {"ok": True}
+
+
+@router.get("/medicines")
+def find_medicines(term: str = "", u=Depends(auth)):
+    """The catalogue, so a pharmacist can add a line the AI missed or read wrongly."""
+    need(u, "pharmacist")
+    return q(
+        "select id, name, schedule, price from meds where generic_of is null and name like ? order by name limit 20",
+        f"%{term.strip()[:40]}%",
+    )
+
+
+@router.post("/orders/{code}/items")
+def add_line(code: str, b: NewLine, u=Depends(auth)):
+    """Add a medicine to an order. It starts as a draft like every other line, so it still needs approval."""
+    need(u, "pharmacist")
+    order = editable_order(code)
+    med = q("select * from meds where id = ? and generic_of is null", b.med_id, one=True)
+    if not med:
+        raise HTTPException(404, "Medicine not found")
+    if rule(med["schedule"])["blocked"]:
+        raise HTTPException(422, f"{med['name']} cannot be sold online")
+    if not 1 <= b.qty <= 50:
+        raise HTTPException(422, "Quantity must be 1 to 50")
+
+    add_item(code, med, med["name"], b.qty, 1.0, "draft", MANUAL)
+    if order["status"] in ("approved", "rejected"):
+        # a new unchecked line means the order needs checking again, and must be routed again afterwards
+        ex("update orders set status = 'awaiting_pharmacist', store_id = null where code = ?", code)
+    log(u["name"], "add_line", f"{code}:{med['name']}")
     return {"ok": True}
 
 
