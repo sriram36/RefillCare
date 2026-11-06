@@ -10,7 +10,6 @@ Usage:
 import argparse
 import difflib
 import json
-import os
 import sys
 from pathlib import Path
 

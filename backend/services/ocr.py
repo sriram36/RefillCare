@@ -2,7 +2,6 @@ import base64
 import io
 import json
 import logging
-import os
 import time
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from core.config import AZURE_ENDPOINT, AZURE_KEY, AZURE_DEPLOY

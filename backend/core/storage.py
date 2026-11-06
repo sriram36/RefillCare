@@ -16,10 +16,6 @@ def _get_store_dir() -> str:
     return store_dir
 
 
-def is_cloud_storage() -> bool:
-    return bool(AZURE_STORAGE_CONNECTION_STRING)
-
-
 def save_encrypted_rx(filename: str, raw_bytes: bytes) -> str:
     """
     Encrypt raw image bytes with AES-128 Fernet and save to cloud blob storage

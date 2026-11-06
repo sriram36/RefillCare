@@ -29,10 +29,9 @@ FKEY = os.getenv("RX_ENC_KEY") or base64.urlsafe_b64encode(
 STORE = os.getenv("RX_STORE_PATH", os.path.join(BASE_DIR, "rx_store"))
 os.makedirs(STORE, exist_ok=True)
 
-# Cloud Storage Configuration (Azure Blob / S3)
+# Cloud storage for prescriptions (Azure Blob). Without it, files are encrypted on local disk.
 AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 AZURE_STORAGE_CONTAINER = os.getenv("AZURE_STORAGE_CONTAINER", "prescriptions")
-AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
 
 # The public demo needs a one-click reset. Set DEMO_MODE=false for a real deployment.
 DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() in ("1", "true", "yes")

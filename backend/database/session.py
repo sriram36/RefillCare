@@ -28,7 +28,6 @@ _PG_POOL = None
 
 
 def is_postgres() -> bool:
-    global _PG_ACTIVE
     if not DATABASE_URL:
         return False
     return _PG_ACTIVE
@@ -70,7 +69,6 @@ def db():
 
 def q(sql: str, *args, one: bool = False):
     """Execute read query and return list of dicts (or single dict if one=True)."""
-    global _PG_ACTIVE, _PG_POOL
     if is_postgres() and _PG_POOL:
         conn = _PG_POOL.getconn()
         try:
