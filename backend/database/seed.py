@@ -147,7 +147,6 @@ def reset_demo_data():
     days_ago = lambda n: (date.today() - timedelta(days=n)).isoformat()
 
     # The audit log is kept on purpose: it is the DPDP record of who opened which prescription.
-    ex("delete from payment_orders")
     ex("delete from transfers")
     ex("delete from subscriptions")
     ex("delete from prescriptions")

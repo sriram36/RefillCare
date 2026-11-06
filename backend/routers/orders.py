@@ -1,8 +1,7 @@
-import json
 import time
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
-from core.config import AREAS, PAYMENT_MODE, RAZORPAY_WEBHOOK_SECRET
+from core.config import AREAS
 from core.storage import save_encrypted_rx
 from core.security import (
     auth, check_consent, check_minor_guardian_consent, need
@@ -12,12 +11,6 @@ from rules import rule
 from services.ocr import demo_png, extract
 from services.orderflow import add_item, ingest_ocr_lines, insert_order
 from services.routing import settle
-from services.payments import (
-    create_payment_order,
-    generate_test_signature,
-    verify_payment_signature,
-    verify_webhook_signature,
-)
 
 router = APIRouter(prefix="/api", tags=["Orders & Cart"])
 
@@ -252,89 +245,20 @@ def payable_total(code: str) -> int:
 
 
 @router.post("/orders/{code}/pay")
-def initiate_payment(code: str, u=Depends(auth)):
+def pay_demo(code: str, u=Depends(auth)):
+    """A dummy payment, for the screen only. There is no gateway: no keys, no callback, no money.
+    It marks the customer's own order as paid and gives back a made-up reference."""
     need(u, "customer")
-    own_order(code, u)
-    total_amount = payable_total(code)
-    if total_amount <= 0:
+    o = own_order(code, u)
+    if o["status"] in ("rejected", "on_hold"):
+        raise HTTPException(409, "This order cannot be paid yet")
+    if o["paid"] == 1:
+        raise HTTPException(409, "This order is already paid")
+    total = payable_total(code)
+    if total <= 0:
         raise HTTPException(422, "Nothing to pay for on this order yet")
 
-    pay_data = create_payment_order(code, total_amount)
-    ex(
-        "insert into payment_orders(order_code, razorpay_order_id, amount, currency, created_at) values(?, ?, ?, ?, ?)",
-        code,
-        pay_data["razorpay_order_id"],
-        pay_data["amount"],
-        pay_data["currency"],
-        int(time.time()),
-    )
-    log(u["name"], "initiate_payment", code)
-    return pay_data
-
-
-def mark_paid(code: str, razorpay_order_id: str, payment_id: str, method: str) -> None:
-    ex(
-        "update orders set paid = 1, payment = ?, payment_ref = ? where code = ?",
-        method,
-        payment_id,
-        code,
-    )
-    ex("update payment_orders set status = 'paid' where razorpay_order_id = ?", razorpay_order_id)
-
-
-@router.post("/orders/{code}/pay/confirm")
-def confirm_test_payment(code: str, u=Depends(auth)):
-    """Test mode only: the server plays the gateway for the signed-in customer. No money moves."""
-    need(u, "customer")
-    if PAYMENT_MODE != "test":
-        raise HTTPException(404, "Not available")
-    own_order(code, u)
-    po = q(
-        "select * from payment_orders where order_code = ? and status = 'created' order by id desc limit 1",
-        code,
-        one=True,
-    )
-    if not po:
-        raise HTTPException(409, "Start the payment first")
-
-    payment_id = f"pay_test_{int(time.time() * 1000)}"
-    signature = generate_test_signature(po["razorpay_order_id"], payment_id)
-    if not verify_payment_signature(po["razorpay_order_id"], payment_id, signature):
-        raise HTTPException(500, "Payment signature check failed")
-
-    mark_paid(code, po["razorpay_order_id"], payment_id, "upi_test")
-    log(u["name"], f"payment_confirmed_test:{payment_id}", code)
-    return {"paid": True, "payment_id": payment_id, "amount_rupees": po["amount"] // 100}
-
-
-@router.post("/payments/webhook")
-async def payment_webhook(request: Request):
-    """Real gateway callback. The body must carry a valid HMAC signature; the order is found
-    from the payment order we created, never from fields in the payload."""
-    raw_body = await request.body()
-    signature = request.headers.get("X-Razorpay-Signature")
-    if not verify_webhook_signature(raw_body, signature, RAZORPAY_WEBHOOK_SECRET):
-        log("webhook:razorpay", "rejected_bad_signature", "-")
-        raise HTTPException(401, "Invalid webhook signature")
-
-    try:
-        payload = json.loads(raw_body)
-        entity = payload["payload"]["payment"]["entity"]
-        order_id = entity["order_id"]
-        payment_id = entity["id"]
-    except (ValueError, KeyError, TypeError):
-        raise HTTPException(400, "Malformed webhook payload")
-
-    if payload.get("event") != "payment.captured":
-        return {"status": "ignored"}
-
-    po = q("select * from payment_orders where razorpay_order_id = ?", order_id, one=True)
-    if not po:
-        return {"status": "ignored"}
-    if entity.get("amount") is not None and int(entity["amount"]) != po["amount"]:
-        log("webhook:razorpay", f"amount_mismatch:{payment_id}", po["order_code"])
-        raise HTTPException(422, "Amount does not match the payment order")
-
-    mark_paid(po["order_code"], order_id, payment_id, "upi_razorpay")
-    log("webhook:razorpay", f"paid:{payment_id}", po["order_code"])
-    return {"status": "ok", "order_code": po["order_code"]}
+    ref = f"DEMO{int(time.time() * 1000) % 100000000:08d}"
+    ex("update orders set paid = 1, payment = 'upi_test', payment_ref = ? where code = ?", ref, code)
+    log(u["name"], "demo_payment", code)
+    return {"paid": True, "amount_rupees": total, "reference": ref}
