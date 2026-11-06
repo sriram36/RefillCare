@@ -3,36 +3,43 @@
 @tailwind utilities;
 
 :root {
-  --teal-primary: #1e595c;
-  --teal-hover: #153e40;
-  --teal-light: #e6f4f5;
   --ink: #16242b;
-  --mute: #54656f;
-  --bg: #f4f7f8;
-  --card: #ffffff;
+  --mute: #4b5b64;
   --line: #d8e2e6;
-  --amber: #b26b00;
-  --red: #c02b2b;
-  --green: #238350;
+  --bg: #fafaf9;
 }
 
-.dark {
-  --teal-primary: #6ec0c5;
-  --teal-hover: #8fd0d4;
-  --teal-light: rgba(110, 192, 197, 0.15);
-  --ink: #eaf1f4;
-  --mute: #9cb1bc;
-  --bg: #0f1519;
-  --card: #182126;
-  --line: #27353c;
-  --amber: #f2ad43;
-  --red: #f27972;
-  --green: #59cb8b;
+html {
+  /* 17px base: customers are often worried, or ordering for a parent, and may be reading on a small phone */
+  font-size: 17px;
 }
 
 body {
   background-color: var(--bg);
   color: var(--ink);
-  font-family: var(--font-sans);
   min-height: 100vh;
+  line-height: 1.6;
+  /* Bengali and Hindi fall back to Noto, which has the glyphs, instead of an unpredictable system font */
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Bengali', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* A clear keyboard focus ring everywhere */
+:focus-visible {
+  outline: 3px solid #2a7c80;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Never let a wide child push the page sideways on a phone */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
