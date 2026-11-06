@@ -1,3 +1,9 @@
+# Run the whole app:   docker compose up --build
+#   frontend  http://localhost:3000        (if port 3000 is busy:  FRONTEND_PORT=3100 docker compose up --build)
+#   backend   http://localhost:8000/docs
+# Sign in from the "Demo accounts" list (OTP 123456). Data lives in the `refillcare-data` volume,
+# so it survives restarts. `docker compose down -v` wipes it.
+
 services:
   backend:
     build:
@@ -6,19 +12,31 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - APP_SECRET=refillcare-dev-secret-2026
-      - PORT=8000
+      # Dev-only default. Set your own for anything shared:  APP_SECRET=... docker compose up
+      APP_SECRET: ${APP_SECRET:-dev-only-change-me}
+      PORT: "8000"
+      DB_PATH: /data/pharmacy.db
+      RX_STORE_PATH: /data/rx_store
     volumes:
-      - ./backend/pharmacy.db:/app/pharmacy.db
-      - ./backend/rx_store:/app/rx_store
+      - refillcare-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Baked into the browser code at build time. This is where YOUR BROWSER reaches the backend.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+
+volumes:
+  refillcare-data:
