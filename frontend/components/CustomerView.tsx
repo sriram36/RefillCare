@@ -1,1121 +1,402 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Pill, Upload, ShoppingCart, Plus, CheckCircle2, ShieldCheck, 
-  Download, Search, AlertTriangle, Truck, Clock, UserPlus, 
-  FileText, X, Check, ArrowRight, Sparkles, MapPin, CreditCard, ChevronRight
-} from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { CheckCircle2, Download, FileText, Search, ShieldCheck, Trash2 } from 'lucide-react';
 import { Language, translate } from '../lib/i18n';
 import { fetchApi, postApi, setUser } from '../lib/api';
-import Timeline from './Timeline';
-import LiveTrackingModal from './LiveTrackingModal';
-import SubscriptionManager from './SubscriptionManager';
+import AddPersonModal from './customer/AddPersonModal';
+import MedicineSearch from './customer/MedicineSearch';
+import OrderCard from './customer/OrderCard';
+import PrescriptionForm from './customer/PrescriptionForm';
+import { btnPrimary, btnQuiet, btnSecondary, card, medName } from './customer/ui';
 
 interface CustomerViewProps {
   user: any;
   lang: Language;
   onToast: (msg: string) => void;
+  /** Called after the account has been erased, so the app can return to the sign-in screen. */
+  onErased?: () => void;
 }
 
-export default function CustomerView({ user, lang, onToast }: CustomerViewProps) {
+const OPEN = ['awaiting_pharmacist', 'on_hold', 'approved'];
+
+export default function CustomerView({ user, lang, onToast, onErased }: CustomerViewProps) {
   const [refills, setRefills] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [subs, setSubs] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [panel, setPanel] = useState<'rx' | 'search' | null>(null);
+  const [showAddPerson, setShowAddPerson] = useState(false);
+  const [busyRefill, setBusyRefill] = useState<number | null>(null);
+  const [confirmErase, setConfirmErase] = useState(false);
 
-  // Search & Cart
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [cart, setCart] = useState<any[]>([]);
+  // shared by the prescription form and the cart
+  const [forName, setForName] = useState('');
+  const [area, setArea] = useState('Park Street');
+  const [payment, setPayment] = useState('cod');
 
-  // Prescription Form
-  const [uploadFor, setUploadFor] = useState('');
-  const [paymentMode, setPaymentMode] = useState('cod');
-  const [deliveryArea, setDeliveryArea] = useState('Park Street');
-  const [demoChoice, setDemoChoice] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [trackingOrder, setTrackingOrder] = useState<any | null>(null);
-  const [payingCode, setPayingCode] = useState<string | null>(null);
+  const t = (k: string, vars?: Record<string, string | number>) => translate(k, lang, vars);
 
-  // Add Family Profile Modal State
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [newProfileName, setNewProfileName] = useState('');
-  const [newProfileRelation, setNewProfileRelation] = useState('Self');
-  const [newProfileIsMinor, setNewProfileIsMinor] = useState(false);
-  const [newProfileConsent, setNewProfileConsent] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
-
-  const t = (k: string) => translate(k, lang);
-
-  const loadData = async () => {
+  const load = useCallback(async () => {
     try {
-      const [rf, os, pr, nt] = await Promise.all([
+      const [rf, os, pr, sb, nt] = await Promise.all([
         fetchApi('refills'),
         fetchApi('orders'),
         fetchApi('profiles'),
-        fetchApi('notes')
+        fetchApi('subscriptions').catch(() => []),
+        fetchApi('notes').catch(() => []),
       ]);
+      setNotes(nt || []);
       setRefills(rf);
       setOrders(os);
       setProfiles(pr);
-      if (pr.length > 0 && !uploadFor) {
-        setUploadFor(pr[0].name);
-      }
-      setNotes(nt);
+      setSubs((sb || []).filter((s: any) => s.active === 1));
+      setForName((cur) => cur || (pr[0] ? pr[0].name : ''));
     } catch (err: any) {
-      onToast(err.message || 'Failed to load data');
+      onToast(err.message || t('try_again'));
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadData();
-    // Live polling: refresh order status every 10 seconds
-    const interval = setInterval(() => {
-      fetchApi('orders')
-        .then(os => setOrders(os))
-        .catch(() => {});
-    }, 10000);
-    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Search handler
-  const handleSearch = async (val: string) => {
-    setSearchTerm(val);
-    if (val.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    try {
-      const res = await fetchApi(`search?term=${encodeURIComponent(val)}`);
-      setSearchResults(res);
-    } catch (err: any) {
-      onToast(err.message);
-    }
-  };
+  useEffect(() => {
+    load();
+    // keep order status fresh without the customer having to refresh
+    const timer = setInterval(() => {
+      fetchApi('orders').then(setOrders).catch(() => {});
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [load]);
 
-  const addToCart = (med: any) => {
-    const existing = cart.find(c => c.id === med.id);
-    if (existing) {
-      setCart(cart.map(c => c.id === med.id ? { ...c, qty: c.qty + 1 } : c));
-    } else {
-      setCart([...cart, { id: med.id, name: med.name, price: med.price, qty: 1 }]);
-    }
-    onToast(`Added ${med.name} to cart`);
-  };
+  const dueRefills = refills.filter((r) => r.due);
 
-  const submitCartOrder = async () => {
-    if (!cart.length) return;
-    try {
-      await postApi('cart', {
-        for_name: uploadFor || user.name,
-        payment: paymentMode,
-        area: deliveryArea,
-        lines: cart.map(c => ({ med_id: c.id, qty: c.qty }))
-      });
-      setCart([]);
-      onToast('Order placed successfully! Routing to nearest pharmacy.');
-      loadData();
-    } catch (err: any) {
-      onToast(err.message);
-    }
-  };
+  // an open order for the same medicine and person means a second tap would only duplicate it
+  const openOrderFor = (r: any) =>
+    orders.find(
+      (o) => OPEN.includes(o.status) && o.for_name === r.for_name && (o.items || []).some((i: any) => i.med_id === r.med_id)
+    );
+  const subFor = (r: any) => subs.find((s) => s.med_id === r.med_id && s.for_name === r.for_name);
 
-  // Reorder refill
-  const handleReorder = async (refillId: number) => {
+  const reorder = async (r: any) => {
+    setBusyRefill(r.id);
     try {
-      await postApi(`refills/${refillId}/reorder`);
-      onToast('Refill request sent to the pharmacist!');
-      loadData();
-    } catch (err: any) {
-      onToast(err.message);
-    }
-  };
-
-  // Upload prescription
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file && !demoChoice) {
-      onToast('Please select a prescription photo or choose a demo prescription.');
-      return;
-    }
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append('for_name', uploadFor || user.name);
-      fd.append('payment', paymentMode);
-      fd.append('area', deliveryArea);
-      fd.append('demo', demoChoice);
-      if (file) {
-        fd.append('file', file);
+      const res = await postApi(`refills/${r.id}/reorder`);
+      if (res.status === 'on_hold') {
+        onToast(t('reorder_on_hold'));
+        setForName(r.for_name);
+        setPanel('rx');
+      } else {
+        onToast(t('reorder_sent'));
       }
-      await fetchApi('orders', {
-        method: 'POST',
-        body: fd
-      });
-      onToast('Prescription submitted! Registered pharmacist assigned for review.');
-      setFile(null);
-      setDemoChoice('');
-      loadData();
+      await load();
     } catch (err: any) {
-      onToast(err.message);
+      onToast(err.message || t('try_again'));
     } finally {
-      setUploading(false);
+      setBusyRefill(null);
     }
   };
 
-  // Re-upload for held order
-  const handleReupload = async (code: string, e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const fd = new FormData(form);
-    const fileInput = form.querySelector('input[type="file"]') as HTMLInputElement;
-    if (fileInput && !fileInput.files?.length) {
-      fd.delete('file');
-    }
+  const turnOnAutoRefill = async (r: any) => {
     try {
-      await fetchApi(`orders/${code}/reupload`, {
-        method: 'POST',
-        body: fd
+      // the dose and pack come from the customer's own refill, so the schedule always matches the supply
+      await postApi('subscriptions', {
+        for_name: r.for_name,
+        med_id: r.med_id,
+        qty: r.qty,
+        per_day: r.per_day,
+        frequency_days: Math.min(90, Math.max(7, Math.round(r.qty / r.per_day))),
       });
-      onToast('New photo uploaded successfully! Queue updated.');
-      loadData();
+      onToast(t('autorefill_done'));
+      load();
     } catch (err: any) {
-      onToast(err.message);
+      onToast(err.message || t('try_again'));
     }
   };
 
-  // DPDP Consent grant
+  const turnOffAutoRefill = async (id: number) => {
+    try {
+      await fetchApi(`subscriptions/${id}`, { method: 'DELETE' });
+      onToast(t('autorefill_cancelled'));
+      load();
+    } catch (err: any) {
+      onToast(err.message || t('try_again'));
+    }
+  };
+
   const grantConsent = async () => {
     try {
       const res = await postApi('consent');
       user.consent_at = res.consent_at;
       setUser(user);
-      onToast('Health data processing consent recorded');
-      loadData();
+      load();
     } catch (err: any) {
-      onToast(err.message);
+      onToast(err.message || t('try_again'));
     }
   };
 
-  // Handle Save New Family Member Profile
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProfileName.trim()) {
-      onToast('Please enter full name');
-      return;
-    }
-    if (newProfileIsMinor && !newProfileConsent) {
-      onToast('Parent/Guardian consent is required for under-18 family members');
-      return;
-    }
-
+  const eraseMyData = async () => {
     try {
-      setSavingProfile(true);
-      await postApi('profiles', {
-        name: newProfileName.trim(),
-        relation: newProfileRelation.trim(),
-        is_minor: newProfileIsMinor,
-        guardian_consent: newProfileConsent
-      });
-      onToast(`Added profile for ${newProfileName.trim()}`);
-      setShowProfileModal(false);
-      setNewProfileName('');
-      setNewProfileRelation('Self');
-      setNewProfileIsMinor(false);
-      setNewProfileConsent(false);
-      loadData();
+      await postApi('me/forget');
+      onToast(t('forget_done'));
+      onErased?.();
     } catch (err: any) {
-      onToast(err.message || 'Failed to create profile');
-    } finally {
-      setSavingProfile(false);
+      onToast(err.message || t('try_again'));
     }
   };
 
-  // Online Payment via UPI (Razorpay)
-  const handlePayOnline = async (orderCode: string) => {
-    try {
-      setPayingCode(orderCode);
-      const res = await postApi(`orders/${orderCode}/pay`);
-      // Simulate real-time Razorpay payment capture webhook
-      await postApi('payments/webhook', {
-        event: 'payment.captured',
-        payload: {
-          payment: {
-            entity: {
-              id: `pay_${Date.now()}`,
-              order_id: res.razorpay_order_id,
-              amount: res.amount,
-              status: 'captured',
-              notes: { order_code: orderCode }
-            }
-          }
-        }
-      });
-      onToast(`Payment of ₹${res.amount_rupees || res.amount / 100} verified via UPI (Razorpay)`);
-      loadData();
-    } catch (err: any) {
-      onToast(err.message || 'Payment initiation failed');
-    } finally {
-      setPayingCode(null);
-    }
-  };
-
-  // Export DPDP Data
   const exportData = async () => {
     try {
       const data = await fetchApi('me/export');
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `refillcare-health-data-${user.phone}.json`;
+      a.download = `my-health-data-${user.phone}.json`;
       a.click();
-      onToast('Personal health record download complete');
+      URL.revokeObjectURL(url);
     } catch (err: any) {
-      onToast(err.message);
+      onToast(err.message || t('try_again'));
     }
   };
 
-  const dueRefills = refills.filter(r => r.due);
-
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 space-y-4">
-        <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
-        <div className="text-sm font-semibold text-slate-700">Loading your health records & prescriptions…</div>
-        <p className="text-xs text-slate-400 max-w-sm text-center">
-          (Render backend cold-start may take up to 45s on first wake-up)
-        </p>
+      <div className="flex flex-col items-center gap-4 py-24 text-center" role="status">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-700 border-t-transparent" />
+        <p className="text-lg text-slate-700">{t('loading')}</p>
+        <p className="max-w-xs text-base text-slate-500">{t('cold_start')}</p>
       </div>
     );
   }
 
+  const optionProps = {
+    lang,
+    profiles,
+    forName,
+    area,
+    payment,
+    onForName: setForName,
+    onArea: setArea,
+    onPayment: setPayment,
+    onAddPerson: () => setShowAddPerson(true),
+  };
+
   return (
-    <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-300">
-      
-      {/* DPDP Consent Banner */}
+    <div className="space-y-10">
+      <h1 className="text-3xl font-bold text-slate-900">{t('hello', { name: user.name.split(' ')[0] })}</h1>
+
       {!user.consent_at && (
-        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/80 p-5 sm:p-6 shadow-xs">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-xl bg-amber-100 text-amber-700 shrink-0">
-              <ShieldCheck className="h-6 w-6" />
-            </div>
-            <div className="space-y-2 flex-1">
-              <h3 className="text-base font-bold text-amber-950 flex items-center gap-2">
-                <span>{t('consent_title')}</span>
-                <span className="text-[11px] font-semibold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
-                  DPDP Act 2023 Required
-                </span>
-              </h3>
-              <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed text-amber-900">
-                {t('consent_body')}
-              </p>
-              <button
-                onClick={grantConsent}
-                className="mt-2 inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-amber-700 active:scale-95"
-              >
-                <Check className="w-4 h-4" />
-                <span>{t('consent_btn')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <section className="space-y-4 rounded-2xl border border-amber-300 bg-amber-50 p-5 sm:p-6" aria-labelledby="consent-h">
+          <h2 id="consent-h" className="flex items-center gap-2 text-xl font-bold text-amber-950">
+            <ShieldCheck className="h-6 w-6 shrink-0" aria-hidden="true" />
+            {t('consent_title')}
+          </h2>
+          <p className="whitespace-pre-line text-lg text-amber-950">{t('consent_body')}</p>
+          <button type="button" onClick={grantConsent} className={btnPrimary}>
+            {t('consent_btn')}
+          </button>
+        </section>
       )}
 
-      {/* Generic Offer Pending Notification Bar */}
-      {(() => {
-        const pendingOffers = orders.filter(
-          o => (o.items || []).some((it: any) => it.offer && it.consent == null)
-        );
-        if (!pendingOffers.length) return null;
-        return (
-          <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 shadow-xs flex items-start gap-3">
-            <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700 shrink-0">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-emerald-950 text-sm flex items-center gap-2 flex-wrap">
-                <span>Generic Savings Offer Waiting for Your Response</span>
-                <span className="text-[11px] font-semibold bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full">
-                  {pendingOffers.length} order{pendingOffers.length > 1 ? 's' : ''}
-                </span>
-              </div>
-              <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
-                Your pharmacist found a cheaper bioequivalent generic alternative. Check your orders below to accept and save.
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                const el = document.getElementById('orders-section');
-                el?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="shrink-0 text-xs font-bold text-emerald-800 underline hover:text-emerald-950"
-            >
-              View
-            </button>
-          </div>
-        );
-      })()}
-
-      {/* Hero 1-Tap Reorder Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-800 via-teal-700 to-emerald-900 p-4 sm:p-5 text-white shadow-md">
-        <div className="absolute -right-8 -bottom-8 w-56 h-56 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
-        <div className="relative z-10 max-w-2xl space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur-md">
-            <Sparkles className="w-3.5 h-3.5 text-teal-200" />
-            Neighborhood Stores • Under 60-Minute Local Dispatch
-          </div>
-          <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">
-            Need Your Monthly Medicine Refill?
+      {notes.length > 0 && (
+        <section className="space-y-3" aria-labelledby="msg-h">
+          <h2 id="msg-h" className="text-xl font-bold text-slate-900">
+            {t('messages')}
           </h2>
-          <p className="text-xs sm:text-sm text-teal-100 leading-relaxed">
-            Upload your prescription photo or choose a chronic prescription. A licensed pharmacist will review, verify generic savings, and route to the nearest store.
-          </p>
-          <div className="pt-2 flex flex-wrap gap-3">
-            <button
-              onClick={() => {
-                const el = document.getElementById('up');
-                el?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="inline-flex items-center gap-2.5 rounded-xl bg-white px-4 py-2 text-xs font-bold text-teal-900 shadow-md transition hover:bg-teal-50 hover:shadow-lg active:scale-95"
-            >
-              <Upload className="w-4 h-4 text-teal-700" />
-              <span>Upload Prescription Photo</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                const el = document.getElementById('search-catalog');
-                el?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="inline-flex items-center gap-2 rounded-xl bg-teal-900/60 border border-teal-400/30 px-4 py-2 text-xs font-semibold text-white backdrop-blur-xs transition hover:bg-teal-900"
-            >
-              <Search className="w-4 h-4" />
-              <span>Search Drug Catalog</span>
-            </button>
-          </div>
-        </div>
-      </div>
+          <ul className="space-y-2">
+            {notes.slice(0, 3).map((n, i) => (
+              <li key={`${n.ts}-${i}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-lg text-slate-900">{n.text}</p>
+                <p className="mt-1 text-base text-slate-500">{new Date(n.ts * 1000).toLocaleDateString(lang === 'en' ? 'en-IN' : lang === 'bn' ? 'bn-IN' : 'hi-IN', { day: 'numeric', month: 'short' })}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-      {/* Running Low Section (Visual Supply Meters) */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-teal-700" />
-              <span>{t('low')}</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Refill alerts calculated based on remaining daily dosages
-            </p>
-          </div>
-          {dueRefills.length > 0 && (
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
-              {dueRefills.length} due for refill
-            </span>
-          )}
-        </div>
+      {/* The one thing most people come here to do */}
+      <section className="space-y-4" aria-labelledby="low-h">
+        <h2 id="low-h" className="text-xl font-bold text-slate-900">
+          {t('low')}
+        </h2>
 
-        {dueRefills.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {dueRefills.map(r => {
-              const days = r.days_left ?? 0;
-              const isUrgent = days <= 5;
-              const isWarning = days <= 10;
-              const progressPct = Math.max(5, Math.min(100, (days / 30) * 100));
-
-              return (
-                <div
-                  key={r.id}
-                  className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs transition hover:shadow-xs space-y-2.5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div className="p-2 rounded-xl bg-teal-50 text-teal-700">
-                          <Pill className="w-4 h-4" />
-                        </div>
-                        <h4 className="text-base font-bold text-slate-900">{r.name}</h4>
-                      </div>
-                      <div className="text-xs text-slate-500 pl-8">
-                        {t('for_lbl')} <strong className="text-slate-800">{r.for_name}</strong> • {r.per_day} tab/day
-                      </div>
-                    </div>
-
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-                      isUrgent
-                        ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
-                        : isWarning
-                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}>
-                      {days} days remaining
-                    </span>
-                  </div>
-
-                  {/* Supply Progress Meter */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px] font-medium text-slate-500">
-                      <span>Supply Remaining</span>
-                      <span className="font-semibold text-slate-700">{days} of 30 days left</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          isUrgent ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
-                        }`}
-                        style={{ width: `${progressPct}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-xs text-slate-400">
-                      Last filled: {r.last_filled || 'Prior month'}
-                    </span>
-                    <button
-                      onClick={() => handleReorder(r.id)}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-teal-700 px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-teal-800 active:scale-95"
-                    >
-                      <ShoppingCart className="w-3.5 h-3.5" />
-                      <span>Reorder 30-Day Pack</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+        {dueRefills.length === 0 ? (
+          <div className={`${card} flex items-start gap-3`}>
+            <CheckCircle2 className="mt-1 h-6 w-6 shrink-0 text-teal-700" aria-hidden="true" />
+            <p className="text-lg text-slate-800">{t('no_low')}</p>
           </div>
         ) : (
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-6 flex items-center gap-4">
-            <div className="p-3 rounded-full bg-emerald-50 shrink-0">
-              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-            </div>
-            <div>
-              <p className="font-semibold text-slate-800 text-sm">All supplies are topped up</p>
-              <p className="text-xs text-slate-500 mt-0.5">{t('no_low')} We'll alert you 10 days before any medicine runs low.</p>
-            </div>
-          </div>
+          dueRefills.map((r) => {
+            const open = openOrderFor(r);
+            const sub = subFor(r);
+            return (
+              <div key={r.id} className={`${card} space-y-5`}>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{medName(r.name)}</p>
+                  <p className="text-lg text-slate-600">{t('refill_for', { name: r.for_name, n: r.per_day })}</p>
+                  <p className={`mt-1 text-lg font-semibold ${r.days_left <= 3 ? 'text-rose-700' : 'text-amber-800'}`}>
+                    {r.days_left <= 0 ? t('runs_out_today') : t('runs_out_days', { n: r.days_left })}
+                  </p>
+                </div>
+
+                {open ? (
+                  <p className="rounded-xl bg-stone-100 px-4 py-4 text-lg font-medium text-slate-800" role="status">
+                    {t('reorder_in_progress', { code: open.code })}
+                  </p>
+                ) : (
+                  <button type="button" onClick={() => reorder(r)} disabled={busyRefill === r.id} className={btnPrimary}>
+                    {t('reorder_btn')}
+                  </button>
+                )}
+
+                {sub ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-base text-slate-700">
+                    <span>{t('autorefill_on', { date: sub.next_refill })}</span>
+                    <button type="button" onClick={() => turnOffAutoRefill(sub.id)} className={btnQuiet}>
+                      {t('autorefill_off_btn')}
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => turnOnAutoRefill(r)} className={btnQuiet}>
+                    {t('autorefill_set')}
+                  </button>
+                )}
+              </div>
+            );
+          })
         )}
-      </div>
+      </section>
 
-      {/* Prescription Upload Form */}
-      <div id="up" className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Upload className="w-5 h-5 text-teal-700" />
-              <span>{t('upload')}</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Upload prescription image (PNG/JPEG) or try a sample prescription
-            </p>
-          </div>
-
+      {/* Everything else is one tap away, not on the page by default */}
+      <section className="space-y-4" aria-label={`${t('send_rx')} / ${t('find_med')}`}>
+        <div className="grid gap-3 sm:grid-cols-2">
           <button
             type="button"
-            onClick={() => setShowProfileModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-teal-700 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 transition active:scale-95 self-start sm:self-auto"
+            aria-expanded={panel === 'rx'}
+            onClick={() => setPanel(panel === 'rx' ? null : 'rx')}
+            className={btnSecondary}
           >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Add Family Member</span>
+            <FileText className="h-6 w-6" aria-hidden="true" />
+            {t('send_rx')}
+          </button>
+          <button
+            type="button"
+            aria-expanded={panel === 'search'}
+            onClick={() => setPanel(panel === 'search' ? null : 'search')}
+            className={btnSecondary}
+          >
+            <Search className="h-6 w-6" aria-hidden="true" />
+            {t('find_med')}
           </button>
         </div>
 
-        <form onSubmit={handleUpload} className="space-y-6">
-          {/* Controls Grid */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {/* For Person */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Prescription For *
-              </label>
-              <select
-                value={uploadFor}
-                onChange={(e) => setUploadFor(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 shadow-2xs focus:border-teal-600 focus:ring-2 focus:ring-teal-100 focus:outline-none"
-              >
-                {profiles.map(p => (
-                  <option key={p.id} value={p.name}>
-                    {p.name} {p.relation ? `(${p.relation})` : ''} {p.is_minor ? '• Minor' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Area */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-teal-600" />
-                <span>Delivery Area *</span>
-              </label>
-              <select
-                value={deliveryArea}
-                onChange={(e) => setDeliveryArea(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 shadow-2xs focus:border-teal-600 focus:ring-2 focus:ring-teal-100 focus:outline-none"
-              >
-                <option value="Park Street">Park Street, Central Kolkata</option>
-                <option value="Salt Lake">Salt Lake (Sector I - V)</option>
-                <option value="Behala">Behala, South Kolkata</option>
-                <option value="Howrah">Howrah Central / Station</option>
-              </select>
-            </div>
-
-            {/* Payment */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                <CreditCard className="w-3.5 h-3.5 text-teal-600" />
-                <span>Payment Mode *</span>
-              </label>
-              <select
-                value={paymentMode}
-                onChange={(e) => setPaymentMode(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 shadow-2xs focus:border-teal-600 focus:ring-2 focus:ring-teal-100 focus:outline-none"
-              >
-                <option value="cod">{t('cod')}</option>
-                <option value="upi_test">{t('upi_test')}</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Quick Demo Selector Chips */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Or Choose a Verified Demo Prescription
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: 'clean', label: 'Clear Printed (Valid)', color: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
-                { id: 'handwritten', label: 'Handwritten Rx', color: 'border-teal-300 bg-teal-50 text-teal-800' },
-                { id: 'blurry', label: 'Blurry Photo (Hold)', color: 'border-amber-300 bg-amber-50 text-amber-800' },
-                { id: 'schedx', label: 'Schedule X (Prohibited)', color: 'border-rose-300 bg-rose-50 text-rose-800' },
-                { id: 'h1', label: 'Controlled (H1 Register)', color: 'border-purple-300 bg-purple-50 text-purple-800' },
-              ].map(d => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => {
-                    setDemoChoice(demoChoice === d.id ? '' : d.id);
-                    setFile(null);
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                    demoChoice === d.id
-                      ? `${d.color} ring-2 ring-teal-600 shadow-xs`
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {d.label} {demoChoice === d.id ? '✓' : ''}
-                </button>
-              ))}
-              {demoChoice && (
-                <button
-                  type="button"
-                  onClick={() => setDemoChoice('')}
-                  className="px-2 py-1 text-xs text-slate-400 hover:text-slate-600"
-                >
-                  Clear demo
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Drag & Drop File Upload Area */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Prescription Photo File
-            </label>
-            <div className="relative border-2 border-dashed border-slate-300 rounded-xl p-3.5 sm:p-4 text-center hover:border-teal-600 transition-colors bg-slate-50/50">
-              <input
-                type="file"
-                accept="image/png,image/jpeg"
-                onChange={(e) => {
-                  setFile(e.target.files?.[0] || null);
-                  setDemoChoice('');
-                }}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <div className="flex flex-col items-center justify-center space-y-2">
-                <div className="p-3 bg-teal-50 text-teal-700 rounded-full">
-                  <FileText className="w-6 h-6" />
-                </div>
-                {file ? (
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold text-slate-900 flex items-center gap-1.5 justify-center">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>{file.name}</span>
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {(file.size / 1024).toFixed(1)} KB • Click or drop another image to replace
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-slate-700">
-                      Drop prescription photo here, or <span className="text-teal-700 underline">browse</span>
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Supports JPG, PNG up to 10MB • AES-128 Encrypted at rest
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Submit Footer */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
-            <span className="text-xs text-slate-500 flex items-center gap-1">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{t('rx_safety_note')}</span>
-            </span>
-
-            <button
-              type="submit"
-              disabled={uploading || (!file && !demoChoice)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-teal-800 disabled:opacity-50 active:scale-95"
-            >
-              <Upload className="h-4 w-4" />
-              <span>{uploading ? 'Processing & Encrypting…' : t('send')}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Search Drug Catalog & Add to Cart */}
-      <div id="search-catalog" className="space-y-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Search className="w-5 h-5 text-teal-700" />
-            <span>{t('search_title')}</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Check stock across all stores and view generic bioequivalent alternatives
-          </p>
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-          <input
-            id="sq"
-            type="text"
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder={t('search_ph')}
-            className="w-full rounded-2xl border border-slate-300 bg-white py-3 pl-10 pr-4 text-sm font-medium text-slate-900 outline-none shadow-2xs transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        {panel === 'rx' && (
+          <PrescriptionForm
+            {...optionProps}
+            user={user}
+            onToast={onToast}
+            onSent={() => {
+              setPanel(null);
+              load();
+            }}
           />
-        </div>
-
-        {/* Search Results */}
-        {searchResults.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {searchResults.map(m => (
-              <div
-                key={m.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex flex-col justify-between space-y-3"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-bold text-slate-900 text-sm">{m.name}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      m.schedule === 'OTC'
-                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                        : m.schedule === 'H1'
-                        ? 'bg-purple-50 text-purple-800 border border-purple-200'
-                        : 'bg-amber-50 text-amber-800 border border-amber-200'
-                    }`}>
-                      {m.schedule}
-                    </span>
-                  </div>
-                  <div className="text-lg font-extrabold text-teal-800">
-                    ₹{m.price}
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                  {m.rule === 'ok' ? (
-                    <button
-                      onClick={() => addToCart(m)}
-                      className="inline-flex items-center gap-1 rounded-xl bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-teal-800 active:scale-95"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Add to Cart</span>
-                    </button>
-                  ) : (
-                    <span className="text-[11px] font-medium text-slate-500">
-                      {m.rule === 'rx' ? 'Requires Rx Verification' : 'Restricted (In-store only)'}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
         )}
-
-        {/* Active Cart Drawer / Summary */}
-        {cart.length > 0 && (
-          <div className="rounded-2xl border border-teal-300 bg-teal-50/70 p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-teal-200/60 pb-3">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5 text-teal-800" />
-                <h4 className="font-bold text-slate-900">{t('cart_title')}</h4>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-teal-200 text-teal-900">
-                  {cart.reduce((sum, item) => sum + item.qty, 0)} items
-                </span>
-              </div>
-              <button
-                onClick={() => setCart([])}
-                className="text-xs font-semibold text-rose-600 hover:underline"
-              >
-                {t('clear_cart')}
-              </button>
-            </div>
-
-            <div className="space-y-2 text-sm">
-              {cart.map(c => (
-                <div key={c.id} className="flex justify-between items-center bg-white/70 px-3 py-2 rounded-xl">
-                  <span className="font-medium text-slate-800">{c.name} × {c.qty}</span>
-                  <span className="font-bold text-teal-900">₹{c.price * c.qty}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-2 flex items-center justify-between">
-              <div>
-                <div className="text-xs text-slate-500">Total Order Amount</div>
-                <div className="text-lg font-extrabold text-teal-900">
-                  ₹{cart.reduce((sum, item) => sum + (item.price * item.qty), 0)}
-                </div>
-              </div>
-
-              <button
-                onClick={submitCartOrder}
-                className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-6 py-2.5 text-xs font-bold text-white shadow transition hover:bg-teal-800 active:scale-95"
-              >
-                <span>{t('place_order')}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+        {panel === 'search' && (
+          <MedicineSearch
+            {...optionProps}
+            onToast={onToast}
+            onOrdered={() => {
+              setPanel(null);
+              load();
+            }}
+          />
         )}
-      </div>
+      </section>
 
-      {/* Chronic Auto-Refill Subscriptions Engine */}
-      <SubscriptionManager user={user} lang={lang} onToast={onToast} />
-
-      {/* Orders List & Active Timeline Tracking */}
-      <div id="orders-section" className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Truck className="w-5 h-5 text-teal-700" />
-              <span>{t('orders')}</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Live status tracking with pharmacist review stages
-            </p>
-          </div>
-          {orders.length > 0 && (
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
-              {orders.length} orders recorded
-            </span>
-          )}
-        </div>
-
-        {orders.length > 0 ? (
-          <div className="space-y-4">
-            {orders.map(o => (
-              <div
-                key={o.code}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-extrabold text-slate-900">#{o.code}</span>
-                    <span className="text-xs text-slate-400">• For {o.for_name}</span>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                    o.status === 'dispatched'
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      : o.status === 'on_hold'
-                      ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : 'bg-teal-50 text-teal-800 border-teal-200'
-                  }`}>
-                    {o.status.replace('_', ' ').toUpperCase()}
-                  </span>
-                </div>
-
-                {/* Progress Timeline */}
-                <Timeline status={o.status} lang={lang} />
-
-                {/* Meta details */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-500 pt-1">
-                  <div>
-                    <span className="text-slate-400">Store:</span> <strong>{o.store || 'Routing to nearest…'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Payment:</span>{' '}
-                    <strong>{o.payment === 'upi_test' ? 'Paid via UPI' : 'Cash on Delivery (COD)'}</strong>
-                  </div>
-                  {o.delivery_partner && (
-                    <div className="text-emerald-700 font-semibold flex items-center gap-1">
-                      <Truck className="w-3.5 h-3.5" />
-                      <span>Partner: {o.delivery_partner}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Online Payment & Live GPS Delivery Tracking Actions */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 flex-wrap gap-2 text-xs">
-                  {o.paid !== 1 && o.payment !== 'upi_test' && o.status !== 'rejected' && o.status !== 'on_hold' && (
-                    <button
-                      onClick={() => handlePayOnline(o.code)}
-                      disabled={payingCode === o.code}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-teal-50 border border-teal-300 text-teal-900 font-bold hover:bg-teal-100 transition shadow-2xs"
-                    >
-                      <CreditCard className="w-3.5 h-3.5 text-teal-700" />
-                      <span>{payingCode === o.code ? 'Processing UPI…' : 'Pay Online via UPI (Razorpay)'}</span>
-                    </button>
-                  )}
-                  {o.status === 'dispatched' && (
-                    <button
-                      onClick={() => setTrackingOrder(o)}
-                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold shadow-xs transition active:scale-95 ml-auto"
-                    >
-                      <Truck className="w-3.5 h-3.5" />
-                      <span>Track Live Delivery GPS</span>
-                    </button>
-                  )}
-                </div>
-
-                {o.total_savings > 0 && (
-                  <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-2.5 flex items-center gap-2 text-xs font-bold text-emerald-800">
-                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Total Generic Savings Achieved: ₹{o.total_savings}</span>
-                  </div>
-                )}
-
-                {/* If on hold: Re-upload form */}
-                {o.status === 'on_hold' && (
-                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
-                      <AlertTriangle className="w-4 h-4 text-amber-600" />
-                      <span>Pharmacist Note: {o.note || 'Prescription image is blurry. Please upload a clear photo.'}</span>
-                    </div>
-                    <form onSubmit={(e) => handleReupload(o.code, e)} className="flex flex-wrap items-center gap-2">
-                      <input
-                        type="file"
-                        name="file"
-                        accept="image/png,image/jpeg"
-                        className="text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-amber-200/60 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-amber-900"
-                      />
-                      <select
-                        name="demo"
-                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700"
-                      >
-                        <option value="">Upload new file above</option>
-                        <option value="clean">Use clear printed demo</option>
-                        <option value="handwritten">Use handwritten demo</option>
-                      </select>
-                      <button
-                        type="submit"
-                        className="rounded-lg bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-teal-800"
-                      >
-                        {t('upload_new')}
-                      </button>
-                    </form>
-                  </div>
-                )}
-
-                {/* Ordered Items List */}
-                <div className="border-t border-slate-100 pt-3 space-y-2">
-                  {o.items?.map((item: any) => (
-                    <div key={item.id} className="text-xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-800">
-                          {item.name} × {item.qty}
-                          {item.status === 'rejected' && (
-                            <span className="ml-2 font-bold text-rose-600">({item.reason})</span>
-                          )}
-                        </span>
-                        {item.savings > 0 && (
-                          <span className="font-bold text-emerald-700">Saved ₹{item.savings}</span>
-                        )}
-                      </div>
-
-                      {/* Generic Alternative Option Callout */}
-                      {item.offer_med && item.consent == null && (
-                        <div className="rounded-xl border border-teal-200 bg-teal-50/70 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="space-y-0.5">
-                            <div className="font-bold text-teal-950 text-xs flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5 text-teal-700" />
-                              <span>Cheaper Generic Alternative Offered</span>
-                            </div>
-                            <p className="text-[11px] text-teal-800">
-                              Switch to bioequivalent <strong>{item.offer_med.name}</strong> at <strong>₹{item.offer_med.price}</strong> (Save ₹{item.price - item.offer_med.price})
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={async () => {
-                                await postApi(`items/${item.id}/consent`, { accept: true });
-                                onToast('Generic alternative accepted! Savings applied.');
-                                loadData();
-                              }}
-                              className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white text-xs hover:bg-emerald-700 shadow-xs"
-                            >
-                              Accept (Save ₹{item.price - item.offer_med.price})
-                            </button>
-                            <button
-                              onClick={async () => {
-                                await postApi(`items/${item.id}/consent`, { accept: false });
-                                onToast('Prescribed brand retained');
-                                loadData();
-                              }}
-                              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 text-xs hover:bg-slate-50"
-                            >
-                              Keep Original
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+      <section className="space-y-4" aria-labelledby="orders-h">
+        <h2 id="orders-h" className="text-xl font-bold text-slate-900">
+          {t('orders')}
+        </h2>
+        {orders.length === 0 ? (
+          <p className="text-lg text-slate-600">{t('no_orders')}</p>
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center text-xs text-slate-500">
-            {t('no_orders')}
-          </div>
+          orders.map((o) => <OrderCard key={o.code} order={o} lang={lang} onToast={onToast} onChanged={load} />)
         )}
-      </div>
+      </section>
 
-      {/* DPDP Privacy & Data Export Footer */}
-      <div className="border-t border-slate-200 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="text-xs text-slate-500 flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-teal-700 shrink-0" />
-          <span>Your personal health data is processed in compliance with DPDP Act 2023.</span>
-        </div>
-        <button
-          onClick={exportData}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 active:scale-95"
-        >
-          <Download className="h-4 w-4" />
-          <span>{t('export_data')}</span>
-        </button>
-      </div>
-
-      {/* Add Family Member Modal */}
-      {showProfileModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2 text-teal-900">
-                <UserPlus className="w-5 h-5 text-teal-700" />
-                <h3 className="font-bold text-base text-slate-900">Add Family Member Profile</h3>
-              </div>
-              <button
-                onClick={() => setShowProfileModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveProfile} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Full Name *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Rina Sen"
-                  value={newProfileName}
-                  onChange={(e) => setNewProfileName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-teal-600 focus:ring-2 focus:ring-teal-100 focus:outline-none"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Relationship</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {['Self', 'Mother', 'Father', 'Spouse', 'Child', 'Grandparent'].map(rel => (
-                    <button
-                      key={rel}
-                      type="button"
-                      onClick={() => setNewProfileRelation(rel)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                        newProfileRelation === rel
-                          ? 'border-teal-700 bg-teal-50 text-teal-900'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {rel}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Minor Checkbox */}
-              <div className="pt-2 border-t border-slate-100 space-y-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newProfileIsMinor}
-                    onChange={(e) => setNewProfileIsMinor(e.target.checked)}
-                    className="w-4 h-4 rounded text-teal-700 focus:ring-teal-600"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">
-                    This person is under 18 years of age (Minor)
+      {subs.filter((s) => !refills.some((r) => r.due && r.med_id === s.med_id && r.for_name === s.for_name)).length > 0 && (
+        <section className="space-y-3" aria-labelledby="auto-h">
+          <h2 id="auto-h" className="text-xl font-bold text-slate-900">
+            {t('autorefill_set')}
+          </h2>
+          <ul className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+            {subs
+              .filter((s) => !refills.some((r) => r.due && r.med_id === s.med_id && r.for_name === s.for_name))
+              .map((s) => (
+                <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
+                  <span className="text-lg">
+                    <strong>{medName(s.med_name)}</strong> · {s.for_name}
+                    <span className="block text-base text-slate-500">{t('autorefill_on', { date: s.next_refill })}</span>
                   </span>
-                </label>
-
-                {newProfileIsMinor && (
-                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
-                    <p className="text-[11px] text-amber-900 leading-relaxed">
-                      <strong>DPDP Act Section 9:</strong> Processing personal and prescription health data of a minor requires verifiable consent from their parent or lawful guardian.
-                    </p>
-                    <label className="flex items-start gap-2 cursor-pointer pt-1">
-                      <input
-                        type="checkbox"
-                        checked={newProfileConsent}
-                        onChange={(e) => setNewProfileConsent(e.target.checked)}
-                        className="w-4 h-4 mt-0.5 rounded text-teal-700 focus:ring-teal-600"
-                        required={newProfileIsMinor}
-                      />
-                      <span className="text-[11px] font-semibold text-amber-950">
-                        I declare that I am the parent or lawful guardian and consent to managing prescriptions for this minor.
-                      </span>
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowProfileModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingProfile}
-                  className="px-5 py-2 text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white rounded-xl shadow-xs transition-colors"
-                >
-                  {savingProfile ? 'Saving…' : 'Save Family Profile'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+                  <button type="button" onClick={() => turnOffAutoRefill(s.id)} className={btnQuiet}>
+                    {t('autorefill_off_btn')}
+                  </button>
+                </li>
+              ))}
+          </ul>
+        </section>
       )}
 
+      <footer className="space-y-4 border-t border-slate-200 pt-6">
+        <p className="flex items-start gap-2 text-base text-slate-600">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" aria-hidden="true" />
+          {t('privacy_note')}
+        </p>
+        <button type="button" onClick={exportData} className={btnQuiet}>
+          <Download className="h-5 w-5" aria-hidden="true" />
+          {t('export_data')}
+        </button>
+        {!confirmErase ? (
+          <button type="button" onClick={() => setConfirmErase(true)} className={btnQuiet}>
+            <Trash2 className="h-5 w-5" aria-hidden="true" />
+            {t('forget_btn')}
+          </button>
+        ) : (
+          <div role="alertdialog" aria-labelledby="erase-h" className="space-y-4 rounded-2xl border border-rose-300 bg-rose-50 p-5">
+            <h2 id="erase-h" className="text-xl font-bold text-rose-950">
+              {t('forget_title')}
+            </h2>
+            <p className="text-base text-rose-950">{t('forget_body')}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button type="button" onClick={() => setConfirmErase(false)} className={btnSecondary}>
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={eraseMyData}
+                className="inline-flex h-14 w-full items-center justify-center rounded-xl bg-rose-700 px-5 text-lg font-semibold text-white hover:bg-rose-800"
+              >
+                {t('forget_yes')}
+              </button>
+            </div>
+          </div>
+        )}
+      </footer>
+
+      {showAddPerson && (
+        <AddPersonModal
+          lang={lang}
+          onClose={() => setShowAddPerson(false)}
+          onToast={onToast}
+          onAdded={(name) => {
+            setForName(name);
+            setShowAddPerson(false);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }
