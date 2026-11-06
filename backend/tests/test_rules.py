@@ -327,11 +327,17 @@ def test_prescription_records_for_refills():
     cu2 = H("9000000002")
     ph = H("9000000099")
 
+    # earlier tests and the seed leave open orders for these people; start from a clean slate
+    A.ex("update orders set status = 'dispatched' where customer_id in (1, 2) and status in ('awaiting_pharmacist', 'on_hold', 'approved')")
+
     # 1. Valid record attaches image to refill reorder and moves to awaiting_pharmacist
     refills_cu1 = c.get("/api/refills", headers=cu1).json()
     refill_mother = next(r for r in refills_cu1 if r["for_name"] == "Mother")
     res_reorder = c.post(f"/api/refills/{refill_mother['id']}/reorder", headers=cu1)
     assert res_reorder.status_code == 200
+    # a second tap on the same refill must not create a duplicate order
+    again = c.post(f"/api/refills/{refill_mother['id']}/reorder", headers=cu1)
+    assert again.status_code == 409 and res_reorder.json()["code"] in again.json()["detail"]
     order_code = res_reorder.json()["code"]
     assert res_reorder.json()["status"] == "awaiting_pharmacist"
     assert "Prescription on file, valid until" in res_reorder.json()["note"]
@@ -359,7 +365,8 @@ def test_prescription_records_for_refills():
     expired_order = next(o for o in c.get("/api/orders", headers=ph).json() if o["code"] == expired_code)
     expired_item_id = expired_order["items"][0]["id"]
     refuse_res = c.post(f"/api/items/{expired_item_id}/decide", json={"action": "approve"}, headers=ph)
-    assert refuse_res.status_code == 422
+    # refused: the order is on hold until a new prescription arrives (the 422 no-prescription check stays as a second layer)
+    assert refuse_res.status_code == 409
 
 
 def test_dpdp_consent_and_minors():
