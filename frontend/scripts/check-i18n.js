@@ -56,7 +56,8 @@ for (const f of files) {
   const used = new Set([
     ...[...text.matchAll(/\bt\(\s*['"](\w+)['"]/g)].map((m) => m[1]),
     ...[...text.matchAll(/translate\(\s*['"](\w+)['"]/g)].map((m) => m[1]),
-    ...[...text.matchAll(/key:\s*'((?:area|sample|rel)_\w+)'/g)].map((m) => m[1]),
+    ...[...text.matchAll(/key:\s*'((?:area|sample|rel|cat)_\w+)'/g)].map((m) => m[1]),
+    ...[...text.matchAll(/\bGROUP_KEY\b[^\n]*'(cat_restricted)'/g)].map((m) => m[1]),
     ...[...text.matchAll(/\[\s*'\w+',\s*'(sample_\w+)'\s*\]/g)].map((m) => m[1]),
   ]);
   for (const k of used) if (!(k in dict.en)) problems.push(`${f}: uses "${k}", which is not defined`);
