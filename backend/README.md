@@ -9,7 +9,7 @@ High-performance Python backend built with **FastAPI** for the RefillCare pharma
 - **Automated Startup Seeding:** Auto-detects missing database and seeds sample stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), chronic patient accounts, sample prescriptions, and medicines on boot.
 - **Trilingual Reminders:** refill reminders are worked out from tablets bought and tablets taken a day, written in the customer's saved language (English, Bengali or Hindi), shown in the app, and sent at most once a day per medicine.
 - **Configurable rules:** `data/rules.json` sets which schedules need a prescription, which are never sold online, and how long a prescription is valid. A malformed file stops the server on start, so the safety gate can never loosen silently.
-- **Payments:** test mode only. The server confirms a test payment for the order's owner. The real gateway webhook checks an HMAC signature and stays closed until `RAZORPAY_WEBHOOK_SECRET` is set.
+- **Payments:** a dummy, for the screen only. `POST /api/orders/{code}/pay` marks the signed-in customer's own order as paid and returns a made-up reference. There is no payment gateway, no keys and no callback.
 - **Stock:** packing takes the quantity from the store's count in one step, and refuses with a clear message if the store cannot cover it.
 
 ## Local Setup

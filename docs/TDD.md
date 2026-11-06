@@ -42,7 +42,6 @@ The schema manages the complete pharmacy reordering lifecycle:
 - `refills`: `id`, `customer_id`, `for_name`, `med_id`, `qty`, `per_day`, `last_filled`.
 - `subscriptions`: `id`, `customer_id`, `for_name`, `med_id`, `qty`, `per_day`, `frequency_days`, `next_refill`, `active`, `created` (chronic auto-refill engine).
 - `transfers`: `id`, `from_store_id`, `to_store_id`, `med_id`, `qty`, `status`, `requested_at`, `fulfilled_at` (inter-store stock balancing).
-- `payment_orders`: `id`, `order_code`, `razorpay_order_id`, `amount`, `currency`, `status`, `created_at` (payment intent tracking).
 - `profiles`: `id`, `customer_id`, `name`, `relation`, `is_minor`, `guardian_consent`.
 - `register`: `order_code`, `item_id`, `prescriber`, `patient`, `qty`, `ts` (statutory Rule 65 Schedule H1 register).
 - `audit`: `ts`, `actor`, `action`, `entity` (audit log (append-only table; not cryptographically tamper-proof) for DPDP Act compliance).
@@ -95,7 +94,7 @@ A multimodal vision model inspects uploaded prescription photos and extracts dra
 
 The following architectural decisions extend beyond the minimal brief to deliver a complete production slice, and are explicitly labelled as assumptions:
 
-- **A1 (Payment Simulation):** Razorpay / UPI is a **TEST-MODE SIMULATION**. No real currency moves. In test mode the server itself confirms a payment, and only for the signed-in customer who owns the order (`POST /api/orders/{code}/pay/confirm`); the browser can no longer declare an order paid. The real gateway callback (`POST /api/payments/webhook`) requires a valid HMAC signature over the request body, finds the order from our own stored payment record rather than from the payload, checks the amount, and stays closed until `RAZORPAY_WEBHOOK_SECRET` is set.
+- **A1 (Dummy payment):** payment exists only so the screen has something to press. `POST /api/orders/{code}/pay` marks the signed-in customer's own order as paid and returns a made-up reference (`DEMO…`). There is no payment gateway: no keys, no callback, no signature, no money. Only the order's owner can call it, and it refuses orders that are on hold, rejected or already paid.
 - **A2 (Doctor Registration Validation):** `rules.validate_doctor_reg` checks the *format* of a registration number (WBMC, NMC, MCI). It is applied to the AI's reading only when live AI reading is configured, and its result is informational: it is not stored and not shown on the pharmacist screen. For Schedule H1 the pharmacist types the prescriber into the register. No connection to any Medical Council registry exists.
 - **A3 (Stock Transfers Hub):** Inter-store stock transfer requisitions between local branches and the central warehouse are implemented to solve the client's stockout drop-off problem.
 - **A4 (Statutory Compliance Center):** A formal transparency disclosure page (`/compliance`) documents patient rights under the DPDP Act 2023 and Rule 65.

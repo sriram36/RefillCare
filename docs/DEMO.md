@@ -23,7 +23,7 @@ A seven-minute walk-through of RefillCare, followed by a map from each line of t
 | 8 | Anita | Open Rina's new order. | The Schedule X line was **rejected on sight** (*Cannot be sold online*) and cannot even be approved. Approve the paracetamol. |
 | 9 | Rina | Reload. Press **Accept** on the generic. | *You saved ₹285.* She was asked, in plain words, before anything changed. |
 | 10 | Behala store | Reload. **Pack and enter invoice**, type an invoice number, then **Hand over to delivery**. | Packing only became possible after approval. Stock is taken from the store's count at the moment it is packed. |
-| 11 | Rina | Reload. | *On the way with Store delivery staff.* A four-step progress line, no horizontal scrolling on a phone. |
+| 11 | Rina | Reload. Press **Pay with UPI (demo)**, then **Pay**. | A UPI-style screen marked *demo*. It shows the amount and marks the order paid. Then reload: *On the way with Store delivery staff.* A four-step progress line, no horizontal scrolling on a phone. |
 | 12 | Anita | Open the **All stores** tab. | Median verification time (a real figure from the orders, under the 10-minute target), orders by store, **rejections with reasons**, low stock, the H1 register, and **Sent without approval: 0**, which is measured from the data and not a fixed label. |
 | 13 | Anita, then Debasish | **Send today's reminders**. Then sign in as Debasish. | The reminder is under *Messages*, with a one-tap reorder right below it. It is sent in the customer's own language. |
 | 14 | Anyone | Change the language (top right) to বাংলা, then हिन्दी. | Every customer screen is translated, not just the headings. |
@@ -54,7 +54,7 @@ A seven-minute walk-through of RefillCare, followed by a map from each line of t
 Said plainly, so nobody finds it later:
 
 - **Sign-in** uses a fixed demo OTP (`123456`). There is no SMS.
-- **Payments** are in test mode. The server confirms a test payment for the signed-in customer. The real payment callback exists and checks its signature, but stays closed until a gateway secret is configured.
+- **Payments** are a dummy. The pay screen is labelled *demo*, and pressing Pay only marks the customer's own order as paid. There is no gateway, no keys and no real money.
 - **Messages** (WhatsApp and SMS) are recorded and shown in the app, not actually sent.
 - **AI reading** of prescriptions is real only when an Azure OpenAI key is configured. Without one, the sample prescriptions return fixed reads, and an uploaded photo goes to the pharmacist to read by hand.
 - **Stores**: three are seeded (Salt Lake, Behala, Howrah Maidan), not 46. The stock CSV route handles any number of stores.

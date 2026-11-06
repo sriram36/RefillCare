@@ -189,7 +189,7 @@ Company A runs a pharmacy network across Kolkata and Howrah (the client's chain 
 
 ## 12. Not Built and Real Open Limits
 
-- Real banking payment gateway (UPI/Razorpay is a test-mode simulation; no real currency moves).
+- Real banking payment gateway (payment is a dummy screen for the UI only; no real currency moves).
 - Real SMS / WhatsApp Business API sending (mocked in-app & log lines only).
 - Live Azure reading not measured on real handwriting (tested on synthetic demo prescriptions only; real clinical accuracy not benchmarked without physical doctor slips).
 - Bengali and Hindi translations in `i18n.ts` need review by a native clinical speaker.
@@ -201,7 +201,7 @@ Company A runs a pharmacy network across Kolkata and Howrah (the client's chain 
 
 - **A1:** Catalog and Schedule classifications are sample data.
 - **A2:** Customer delivery areas are four sample Kolkata/Howrah zones.
-- **A3:** Razorpay/UPI integration is a **TEST-MODE SIMULATION** (no real money moves).
+- **A3:** Payment is a **dummy**, for the screen only (no gateway, no real money).
 - **A4:** Doctor registration number: format check only; informational; does not block dispensing. Structural check runs on synthetic demo prescriptions only.
 - **A5:** Inter-store stock transfers from the central warehouse are implemented to solve stockouts.
 - **A6:** A statutory compliance center (`/compliance`) is provided.

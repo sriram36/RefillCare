@@ -25,7 +25,7 @@ RefillCare/
 │   │   └── seed.py           # Auto-seeding stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief), patients, and test orders
 │   ├── routers/              # Domain-bounded API route modules
 │   │   ├── auth.py           # Login, logout & DPDP consent
-│   │   ├── orders.py         # Order lifecycle, search, payments & webhook
+│   │   ├── orders.py         # Order lifecycle, search, cart and the dummy payment
 │   │   ├── pharmacist.py     # Verification queue, H1 register & approvals
 │   │   ├── store.py          # Store fulfillment, dispatch & stock transfers
 │   │   ├── subscriptions.py  # Chronic auto-refill subscriptions engine
@@ -36,7 +36,6 @@ RefillCare/
 │   │   ├── ocr.py            # Multimodal prescription extraction & doctor check
 │   │   ├── catalog.py        # Medicine catalog & generic mappings
 │   │   ├── routing.py        # Nearest-store inventory routing
-│   │   ├── payments.py       # Razorpay order generation & HMAC verification
 │   │   └── notifications.py  # SMS / WhatsApp dispatch logging
 │   ├── tests/                # 66 automated tests: the approval gate on every order path, stock, payments, ownership, DPDP
 │   ├── requirements.txt      # Python dependencies
@@ -119,13 +118,33 @@ python -m uvicorn app:app --port 8000 --reload
 ```
 The database and sample seed data (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Salt Lake, Behala, Howrah Maidan, sample patients, medicines, and encrypted demo prescriptions) are created automatically on first run.
 
-#### 2. Start Frontend
+#### 2. Start Frontend (in a second terminal)
 ```bash
 cd frontend
 npm install
+
+# one time: tell the frontend where the backend is
+cp .env.example .env.local        # Windows PowerShell: Copy-Item .env.example .env.local
+
 npm run dev
 ```
-Open **[http://localhost:3000](http://localhost:3000)** in your browser.
+Open **[http://localhost:3000](http://localhost:3000)**. If something else already uses port 3000, run `npm run dev -- -p 3100` and open that port instead.
+
+Sign in from the **Demo accounts** list. If you want to start the story again, press **Restart demo** on the sign-in screen.
+
+#### 3. Check that everything works (optional)
+```bash
+# backend tests (from backend/, with the virtual environment active)
+python -m pytest tests -q
+
+# translations: every key exists in English, Bengali and Hindi (from frontend/)
+npm run check:i18n
+
+# the whole demo story through the real screens (from the repo root; needs Chrome)
+node e2e/demo_flow.js http://localhost:3000
+```
+
+Payment is a dummy: the pay screen is marked *demo*, and pressing Pay only marks the order as paid. No keys or gateway are needed.
 
 ---
 
