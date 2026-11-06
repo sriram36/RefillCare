@@ -10,7 +10,7 @@
 
 ## 1. Architecture and Rationale
 
-RefillCare is an end-to-end pharmacy reordering platform designed for Company A: the client's chain has 46 stores; this demo seeds the three stores named in the brief (Store 1: Salt Lake, Store 2: Behala, Store 3: Howrah Maidan) along with the central warehouse. The architecture separates user experience and business rules into two decoupled services:
+RefillCare is an end-to-end pharmacy reordering platform designed for Company A: the client's chain has 46 stores; this demo seeds 15, including the three named in the brief (Store 1: Salt Lake, Store 2: Behala, Store 3: Howrah Maidan) along with the central warehouse. The architecture separates user experience and business rules into two decoupled services:
 
 1. **Frontend Client (`/frontend`):**
    - Standalone Next.js 14 application utilizing the App Router, React 18, TypeScript, and Tailwind CSS.
@@ -34,7 +34,7 @@ The schema manages the complete pharmacy reordering lifecycle:
 
 - `users`: `id`, `name`, `phone` (unique), `role` (`customer`, `pharmacist`, `store`), `store_id`, `consent_at`, `token_ver` (defaults to 1).
 - `meds`: `id`, `name`, `schedule` (`OTC`, `H`, `H1`, `X`, `NARC`), `price`, `generic_of`, `category` (the group a customer browses, such as Diabetes or First aid). The sample catalogue is 41 medicines and 8 cheaper generics in `services/catalog.py`, with a starting stock for each at every store in `data/stock.csv`.
-- `stores`: `id`, `name`, `lat`, `lng` (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Store 1: Salt Lake, Store 2: Behala, Store 3: Howrah Maidan).
+- `stores`: `id`, `name`, `lat`, `lng` (the client's chain has 46 stores; this demo seeds 15, including the three named in the brief: Store 1: Salt Lake, Store 2: Behala, Store 3: Howrah Maidan).
 - `stock`: `store_id`, `med_id`, `qty` (primary key: `store_id`, `med_id`; refreshed from daily CSV).
 - `orders`: `code` (primary key), `customer_id`, `for_name`, `status`, `store_id`, `rx_file`, `note`, `created`, `verified_at`, `invoice_no`, `payment`, `paid`, `area`, `payment_ref`, `delivery_partner`.
 - `items`: `id`, `order_code`, `med_id`, `name`, `schedule`, `qty`, `price`, `conf`, `status` (`draft`, `approved`, `rejected`), `approved_by`, `reason`, `offer`, `consent`, `original_price`.
@@ -52,7 +52,7 @@ The schema manages the complete pharmacy reordering lifecycle:
 
 ### Roles
 - `customer`: 1-tap chronic reorders, prescription photo upload, family profile management, DPDP consent grant, data export, and Section 12 *Right to Erasure*.
-- `pharmacist`: reviews side-by-side prescription viewer and AI draft items, approves/edits/rejects lines with required statutory reason, validates prescriber license (WBMC/NMC), offers generic bioequivalent alternatives, inspects the central operational dashboard (the client's chain has 46 stores; this demo seeds the three stores named in the brief), and exports the Schedule H1 register.
+- `pharmacist`: reviews side-by-side prescription viewer and AI draft items, approves/edits/rejects lines with required statutory reason, validates prescriber license (WBMC/NMC), offers generic bioequivalent alternatives, inspects the central operational dashboard (the client's chain has 46 stores; this demo seeds 15, including the three named in the brief), and exports the Schedule H1 register.
 - `store`: scoped strictly to assigned store location, packs approved orders with physical store invoice entry, and executes courier handover. Store staff are physically prevented from accessing prescription image files.
 
 ### The Regulatory Safety Dispatch Gate
@@ -114,13 +114,13 @@ The following architectural decisions extend beyond the minimal brief to deliver
 3. **Free Hosting Ephemeral Storage & Cold Starts:** The free Render web service tier sleeps after 15 minutes of inactivity (~50-second cold start) and resets ephemeral SQLite disk storage on restart. Permanent storage needs either a paid persistent disk for the SQLite file or finishing the PostgreSQL support (see the database layer note above).
 4. **Mocked Outside Systems:** No live SMS, WhatsApp Business API, UPI banking rail, or logistics carrier API is connected; all outside communication and payment flows are safe test simulations.
 5. **Languages on staff screens:** the customer screens and reminder messages are in English, Bengali and Hindi. The pharmacist, store and dashboard screens and the privacy page are English only.
-6. **Reminders and routing:** reminders run when a pharmacist presses the button, not on a timer. An order is routed to one store that has every item; if none does, the pharmacist is told which medicine is short and stores can request transfers from each other. Three stores are seeded, not 46.
+6. **Reminders and routing:** reminders run when a pharmacist presses the button, not on a timer. An order is routed to one store that has every item; if none does, the pharmacist is told which medicine is short and stores can request transfers from each other. Fifteen stores are seeded, not 46; only the three named in the brief have staff logins.
 
 ---
 
 ## 8. Verification & Testing
 
-- **Backend Automated Tests:** **80 passed tests** (`cd backend && python -m pytest tests -q`). Each test file starts from its own freshly seeded database. `tests/test_safety_gate.py` tries every way of creating an order (upload, refill, subscription, re-upload, cart, generic swap) and checks that none can be packed or dispatched without a pharmacist's approval; it also covers Schedule X and narcotics, stock, payments, order ownership, transfers, the rules file, reminders, the pharmacist adding a line the AI missed, the medicine catalogue and its search, and the dashboard's measured numbers. The safety fixes were mutation-checked: removing each one in turn makes a test fail.
+- **Backend Automated Tests:** **88 passed tests** (`cd backend && python -m pytest tests -q`). Each test file starts from its own freshly seeded database. `tests/test_safety_gate.py` tries every way of creating an order (upload, refill, subscription, re-upload, cart, generic swap) and checks that none can be packed or dispatched without a pharmacist's approval; it also covers Schedule X and narcotics, stock, payments, order ownership, transfers, the rules file, reminders, the pharmacist adding a line the AI missed, the medicine catalogue and its search, the store network and its past orders, and the dashboard's measured numbers. The safety fixes were mutation-checked: removing each one in turn makes a test fail.
 - **End-to-end demo flow:** `node e2e/demo_flow.js <url>` runs the whole demo story through the real screens as each person (32 checks), including the locked store screen, the side-by-side review, Schedule X, the generic consent, the dashboard, reminders, Bengali and Hindi, registering and deleting a new customer, and that no screen scrolls sideways at 390px. It resets the demo data first, so it can be repeated.
 - **Translations:** `cd frontend && npm run check:i18n` fails if any language is missing a key, a `{placeholder}` differs, or a value was left in English.
 - **Frontend Production Build:** `next build` compiles all 3 static application routes (`/`, `/_not-found`, `/compliance` — 5 static pages total) with 0 errors.

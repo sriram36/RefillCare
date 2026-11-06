@@ -59,7 +59,8 @@ Said plainly, so nobody finds it later:
 - **Payments** are a dummy. The pay screen is labelled *demo*, and pressing Pay only marks the customer's own order as paid. There is no gateway, no keys and no real money.
 - **Messages** (WhatsApp and SMS) are recorded and shown in the app, not actually sent.
 - **AI reading** of prescriptions is real only when an Azure OpenAI key is configured. Without one, the sample prescriptions return fixed reads, and an uploaded photo goes to the pharmacist to read by hand.
-- **Stores**: three are seeded (Salt Lake, Behala, Howrah Maidan), not 46. The stock CSV route handles any number of stores.
+- **Stores**: 15 are seeded, not 46. Only Salt Lake, Behala and Howrah Maidan, the three named in the brief, have staff logins. The stock CSV route handles any number of stores.
+- **Past orders**: 36 closed orders from 8 sample customers are seeded so the dashboard has figures to show. The demo reset brings them back. They are not real, and a real database never gets them.
 - **Staff screens** (pharmacist, store, dashboard) and the privacy page are in English only. The customer screens, which the brief centres on, are in all three languages.
 - **Reminders** run when a pharmacist presses the button. They are not on a timer yet.
 - **Routing** picks one store that has every item. If none does, the pharmacist sees which medicine is short, and stores can request a transfer from each other.

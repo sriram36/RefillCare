@@ -1,6 +1,6 @@
 # RefillCare Deployment & Operations Guide
 
-RefillCare is an end-to-end pharmacy reorder and verification system built for a chain across Kolkata and Howrah (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Salt Lake, Behala, Howrah Maidan).
+RefillCare is an end-to-end pharmacy reorder and verification system built for a chain across Kolkata and Howrah (the client's chain has 46 stores; this demo seeds 15, including the three named in the brief: Salt Lake, Behala, Howrah Maidan).
 It features a dedicated **Next.js 14 App Router frontend** and a high-performance **FastAPI backend** with DPDP Act encryption, Drugs & Cosmetics Act Schedule H/H1 regulatory gates, and automated stock routing.
 
 - **Live Web Application:** [https://refillcare.vercel.app](https://refillcare.vercel.app)
@@ -65,11 +65,12 @@ The Docker container automatically seeds the database on startup:
 2. When the Docker container starts, `app.py` runs `init()`.
 3. Seeing that no database exists on the first boot, `init()`:
    - Creates all tables (`SCHEMA`).
-   - Seeds sample stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Salt Lake, Behala, Howrah Maidan).
+   - Seeds sample stores (the client's chain has 46 stores; this demo seeds 15, including the three named in the brief: Salt Lake, Behala, Howrah Maidan).
    - Seeds regular patients: **Debasish Ghosh** (diabetes / Metformin), **Rina Sen** (blood pressure / Telmisartan), and **Arif Mondal** (thyroid / Levothyroxine).
    - Seeds store staff and registered pharmacist Anita Rao.
    - Seeds the medicine catalogue: 41 medicines in 12 groups (over-the-counter, Schedule H, Schedule H1, and restricted Schedule X and narcotic items that are never sold online) and 8 cheaper generics.
    - Seeds a starting stock for every medicine at each seeded store.
+   - Seeds 36 past orders (dispatched or rejected, over the last three weeks) for 8 more sample customers, with the Schedule H1 register entries, so the dashboard has real figures from the first minute. The past orders are added only to a fresh or reset database, never to an existing one.
    - On every later start it adds any catalogue medicine or stock row that is missing, and never overwrites a name, a price or a stock count that someone has changed, so an existing database picks up new medicines safely.
    - Calls `seed_images()` to generate and encrypt initial synthetic sample prescriptions (`RX-50211`, `RX-50214`, `RX-50219`).
 
@@ -179,7 +180,7 @@ The sign-in screen has a phone number and OTP form (OTP `123456`). Any new 10-di
 
 ## 7. Verification & Testing
 
-### Backend tests (80)
+### Backend tests (88)
 ```bash
 cd backend
 python -m pip install -r requirements.txt

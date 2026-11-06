@@ -19,7 +19,7 @@ An AI model reads uploaded prescriptions, but only as a draft. A human registere
 
 ## 2. Background and Problem
 
-Company A runs a pharmacy network across Kolkata and Howrah (the client's chain has 46 stores; this demo seeds the three stores named in the brief: Salt Lake, Behala, Howrah Maidan) and a central warehouse, with 380 staff and revenue of ₹180–210 crore a year. A large share of sales is repeat medicine for diabetes, blood pressure and thyroid.
+Company A runs a pharmacy network across Kolkata and Howrah (the client's chain has 46 stores; this demo seeds 15, including the three named in the brief: Salt Lake, Behala, Howrah Maidan) and a central warehouse, with 380 staff and revenue of ₹180–210 crore a year. A large share of sales is repeat medicine for diabetes, blood pressure and thyroid.
 
 **Today:** customers call or WhatsApp a store with a photo of the prescription. Pharmacists check stock and reply, and staff deliver locally. Refills depend on the customer remembering. Prescriptions sit on store phones, and stores cannot see each other’s stock.
 
@@ -53,7 +53,7 @@ Company A runs a pharmacy network across Kolkata and Howrah (the client's chain 
 | Customer or caregiver (mobile) | Reorder in a minute; calm, trustworthy app; often ordering for a parent | Customer role |
 | Store pharmacist | See the prescription beside the matched items; approve, edit or reject with a reason | Pharmacist role |
 | Store staff | Pick, pack, enter the store invoice number, hand over to delivery | Store staff role (scoped per store) |
-| Central operations | One view of orders across stores (the client's chain has 46 stores; this demo seeds the three stores named in the brief) | All stores tab in the pharmacist view |
+| Central operations | One view of orders across stores (the client's chain has 46 stores; this demo seeds 15, including the three named in the brief) | All stores tab in the pharmacist view |
 
 ---
 
@@ -181,7 +181,7 @@ Company A runs a pharmacy network across Kolkata and Howrah (the client's chain 
 
 ## 11. Quality and Test Status
 
-- **80 automated backend tests** (`python -m pytest backend/tests -q`): the approval gate on every order path, Schedule X, routing and stock, generic consent, H1 register, role scoping and ownership, search/cart, reminders, signed payments, storage, subscriptions, transfers, the rules file, and security.
+- **88 automated backend tests** (`python -m pytest backend/tests -q`): the approval gate on every order path, Schedule X, routing and stock, generic consent, H1 register, role scoping and ownership, search/cart, reminders, signed payments, storage, subscriptions, transfers, the rules file, and security.
 - **End-to-end demo flow** (`node e2e/demo_flow.js <url>`): the whole story through the real screens as each person, 32 checks, including a 390px phone check that no screen scrolls sideways.
 - **Translation check** (`npm run check:i18n` in `frontend/`).
 
