@@ -11,7 +11,7 @@ It features a dedicated **Next.js 14 App Router frontend** and a high-performanc
 
 ## Try This in 3 Minutes
 
-Sign in with the demo accounts listed under the phone and OTP form. The OTP is `123456`. **Restart demo** (on the sign-in screen) puts everything back to the start, so you can repeat this as often as you like. The full scripted walk-through, with what to say at each step, is in **[DEMO.md](DEMO.md)**.
+Sign in with the demo accounts listed under the phone and OTP form. The OTP is `123456`. **Restart demo** (on the sign-in screen) puts everything back to the start, so you can repeat this as often as you like. A fuller scripted walk-through is in `docs/DEMO.md` in the repository.
 
 1. **See that nothing leaves a store before a pharmacist approves it**
    - Sign in as **Behala store**. Order `RX-50214` (Telmisartan, Schedule H) is locked, and its pack button reads *Waiting for the pharmacist*.
@@ -177,7 +177,7 @@ The sign-in screen has a phone number and OTP form (OTP `123456`). Any new 10-di
 
 ## 7. Verification & Testing
 
-### Backend tests (66)
+### Backend tests (64)
 ```bash
 cd backend
 python -m pip install -r requirements.txt
@@ -185,7 +185,7 @@ python -m pytest tests -q
 ```
 Each test file starts from its own freshly seeded database. `tests/test_safety_gate.py` tries every way of creating an order (upload, refill, subscription, re-upload, cart, generic swap) and checks that none of them can be packed or dispatched without a pharmacist's approval, that Schedule X and narcotics are never sold, and that stock, payments and ownership cannot be bypassed.
 
-### End-to-end demo flow (28 checks)
+### End-to-end demo flow (29 checks)
 Needs Chrome (set `CHROME_PATH` if it is not in the usual place). Start the backend and the frontend, then:
 ```bash
 node e2e/demo_flow.js http://localhost:3000

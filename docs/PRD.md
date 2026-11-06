@@ -181,8 +181,8 @@ Company A runs a pharmacy network across Kolkata and Howrah (the client's chain 
 
 ## 11. Quality and Test Status
 
-- **66 automated backend tests** (`python -m pytest backend/tests -q`): the approval gate on every order path, Schedule X, routing and stock, generic consent, H1 register, role scoping and ownership, search/cart, reminders, signed payments, storage, subscriptions, transfers, the rules file, and security.
-- **End-to-end demo flow** (`node e2e/demo_flow.js <url>`): the whole story through the real screens as each person, 28 checks, including a 390px phone check that no screen scrolls sideways.
+- **64 automated backend tests** (`python -m pytest backend/tests -q`): the approval gate on every order path, Schedule X, routing and stock, generic consent, H1 register, role scoping and ownership, search/cart, reminders, signed payments, storage, subscriptions, transfers, the rules file, and security.
+- **End-to-end demo flow** (`node e2e/demo_flow.js <url>`): the whole story through the real screens as each person, 29 checks, including a 390px phone check that no screen scrolls sideways.
 - **Translation check** (`npm run check:i18n` in `frontend/`).
 
 ---
