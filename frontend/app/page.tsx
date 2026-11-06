@@ -114,7 +114,7 @@ export default function Home() {
           <>
             {user.role === 'customer' && <CustomerView user={user} lang={lang} onToast={showToast} onErased={handleLogout} />}
 
-            {user.role === 'store' && <StoreView user={user} lang={lang} onToast={showToast} />}
+            {user.role === 'store' && <StoreView user={user} onToast={showToast} />}
 
             {user.role === 'pharmacist' && (
               <div className="space-y-6">
@@ -140,20 +140,10 @@ export default function Home() {
                 </div>
 
                 {activeTab === 'pharmacist' && (
-                  <PharmacistView
-                    user={user}
-                    lang={lang}
-                    onToast={showToast}
-                    onOpenDashboard={() => setActiveTab('dashboard')}
-                  />
+                  <PharmacistView onToast={showToast} />
                 )}
                 {activeTab === 'dashboard' && (
-                  <DashboardView
-                    user={user}
-                    lang={lang}
-                    onToast={showToast}
-                    onBackToQueue={() => setActiveTab('pharmacist')}
-                  />
+                  <DashboardView onToast={showToast} onBackToQueue={() => setActiveTab('pharmacist')} />
                 )}
               </div>
             )}

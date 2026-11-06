@@ -2,14 +2,10 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, Check, ChevronDown, RefreshCw, ShieldCheck, X } from 'lucide-react';
-import { Language } from '../lib/i18n';
 import { fetchApi, postApi, getToken, buildApiUrl } from '../lib/api';
 
 interface PharmacistViewProps {
-  user: any;
-  lang: Language;
   onToast: (msg: string) => void;
-  onOpenDashboard?: () => void;
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -68,7 +64,7 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   );
 }
 
-export default function PharmacistView({ user, lang, onToast, onOpenDashboard }: PharmacistViewProps) {
+export default function PharmacistView({ onToast }: PharmacistViewProps) {
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrderState] = useState<any | null>(null);
   // The refresh timer below was created on the first render, so it must not read selectedOrder from state:

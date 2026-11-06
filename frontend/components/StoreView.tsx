@@ -2,12 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { ArrowRightLeft, CheckCircle2, Package, Plus, RefreshCw, Truck, X } from 'lucide-react';
-import { Language } from '../lib/i18n';
 import { fetchApi, postApi } from '../lib/api';
 
 interface StoreViewProps {
   user: any;
-  lang: Language;
   onToast: (msg: string) => void;
 }
 

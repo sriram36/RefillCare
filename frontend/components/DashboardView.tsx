@@ -2,12 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, ArrowLeft, Bell, RefreshCw, Upload } from 'lucide-react';
-import { Language } from '../lib/i18n';
 import { fetchApi, postApi, buildApiUrl, getToken } from '../lib/api';
 
 interface DashboardViewProps {
-  user: any;
-  lang: Language;
   onToast: (msg: string) => void;
   onBackToQueue?: () => void;
 }

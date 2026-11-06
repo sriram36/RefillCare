@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { Language, translate } from '../../lib/i18n';
 import { btnQuiet, choice, label } from './ui';
 
-export const AREAS = [
+const AREAS = [
   { value: 'Park Street', key: 'area_park' },
   { value: 'Salt Lake', key: 'area_saltlake' },
   { value: 'Behala', key: 'area_behala' },
