@@ -64,6 +64,94 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   );
 }
 
+/** Add a medicine the AI missed or read wrongly. The line starts as a draft, so it still needs approval. */
+function AddMedicine({ code, onToast, onAdded }: { code: string; onToast: (m: string) => void; onAdded: () => void }) {
+  const [term, setTerm] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [qty, setQty] = useState(1);
+  const [busy, setBusy] = useState(false);
+
+  const search = async (value: string) => {
+    setTerm(value);
+    if (value.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    try {
+      setResults(await fetchApi(`medicines?term=${encodeURIComponent(value.trim())}`));
+    } catch (err: any) {
+      onToast(err.message || 'Could not search the list.');
+    }
+  };
+
+  const add = async (m: any) => {
+    setBusy(true);
+    try {
+      await postApi(`orders/${code}/items`, { med_id: m.id, qty });
+      onToast(`Added ${m.name.split(',')[0]}. Check it, then approve.`);
+      setTerm('');
+      setResults([]);
+      setQty(1);
+      onAdded();
+    } catch (err: any) {
+      onToast(err.message || 'Could not add it.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <details className="rounded-xl border border-dashed border-slate-300 p-4">
+      <summary className="min-h-[2.75rem] cursor-pointer select-none text-base font-semibold text-slate-800">Add a medicine</summary>
+      <div className="mt-2 space-y-3">
+        <p className="text-base text-slate-600">For a medicine the AI missed or read wrongly. You still approve it.</p>
+        <div className="flex gap-2">
+          <input
+            type="search"
+            value={term}
+            onChange={(e) => search(e.target.value)}
+            aria-label="Search the medicine list"
+            placeholder="Search by name"
+            className={`${fieldClass} flex-1`}
+          />
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={qty}
+            onChange={(e) => setQty(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+            aria-label="Packs to add"
+            className="h-[3.25rem] w-20 rounded-xl border border-slate-300 px-3 text-center text-lg font-semibold"
+          />
+        </div>
+        {results.length > 0 && (
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+            {results.map((m) => (
+              <li key={m.id} className="flex items-center justify-between gap-3 p-3">
+                <span className="min-w-0 text-base text-slate-900">
+                  {m.name.split(',')[0]}
+                  <span className="block text-slate-600">
+                    {m.name.split(',').slice(1).join(',').trim()}
+                    {m.name.includes(',') ? ' · ' : ''}Schedule {m.schedule} · ₹{m.price}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => add(m)}
+                  className="h-11 shrink-0 rounded-xl border border-teal-700 px-4 text-base font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-60"
+                >
+                  Add
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </details>
+  );
+}
+
 export default function PharmacistView({ onToast }: PharmacistViewProps) {
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrderState] = useState<any | null>(null);
@@ -402,7 +490,7 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
 
                   {(selectedOrder.items || []).length === 0 ? (
                     <p className="rounded-xl border border-slate-200 bg-stone-50 p-4 text-base text-slate-700">
-                      Nothing could be read. Ask for a clearer photo.
+                      Nothing could be read. Add the medicines yourself below, or ask for a clearer photo.
                     </p>
                   ) : (
                     (selectedOrder.items || []).map((item: any) => {
@@ -437,8 +525,14 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                               <span
                                 className={`inline-flex items-center gap-1 text-base font-medium ${lowConf ? 'text-amber-800' : 'text-slate-600'}`}
                               >
-                                {lowConf && <AlertTriangle className="h-4 w-4" aria-hidden="true" />}
-                                {lowConf ? 'Check the image' : 'Read'} · {Math.round(item.conf * 100)}%
+                                {item.reason === 'Added by pharmacist' ? (
+                                  'Added by you'
+                                ) : (
+                                  <>
+                                    {lowConf && <AlertTriangle className="h-4 w-4" aria-hidden="true" />}
+                                    {lowConf ? 'Check the image' : 'Read'} · {Math.round(item.conf * 100)}%
+                                  </>
+                                )}
                               </span>
                             </div>
                           </div>
@@ -506,6 +600,9 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                         </div>
                       );
                     })
+                  )}
+                  {!['on_hold', 'packed', 'dispatched'].includes(selectedOrder.status) && (
+                    <AddMedicine code={selectedOrder.code} onToast={onToast} onAdded={() => loadOrders(selectedOrder.code)} />
                   )}
                 </section>
               </div>
