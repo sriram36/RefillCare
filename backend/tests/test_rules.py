@@ -8,6 +8,8 @@ os.environ["DB_PATH"] = tempfile.mktemp(suffix=".db")
 from fastapi.testclient import TestClient
 
 import app as A
+from core.security import reset_failed_login
+from database.session import ex
 import rules as R
 
 c = TestClient(A.app)
@@ -240,7 +242,6 @@ def test_sample_orders_have_prescription_images():
 
 
 def test_store_staff_scope():
-    ph = H("9000000099")
     salt = H("9000000081")
     behala = H("9000000082")
 
@@ -328,7 +329,7 @@ def test_prescription_records_for_refills():
     ph = H("9000000099")
 
     # earlier tests and the seed leave open orders for these people; start from a clean slate
-    A.ex("update orders set status = 'dispatched' where customer_id in (1, 2) and status in ('awaiting_pharmacist', 'on_hold', 'approved')")
+    ex("update orders set status = 'dispatched' where customer_id in (1, 2) and status in ('awaiting_pharmacist', 'on_hold', 'approved')")
 
     # 1. Valid record attaches image to refill reorder and moves to awaiting_pharmacist
     refills_cu1 = c.get("/api/refills", headers=cu1).json()
@@ -423,7 +424,7 @@ def test_dpdp_consent_and_minors():
 def test_signin_rate_limiting_and_logout():
     test_phone = "9000000077"
     # Seed or use test user
-    A.ex("insert or ignore into users(id, name, phone, role) values(77, 'RateLimit Test', '9000000077', 'customer')")
+    ex("insert or ignore into users(id, name, phone, role) values(77, 'RateLimit Test', '9000000077', 'customer')")
 
     # 5 wrong attempts
     for _ in range(5):
@@ -436,7 +437,7 @@ def test_signin_rate_limiting_and_logout():
     assert "Too many failed login attempts" in r_locked.json()["detail"]
 
     # Reset rate limit tracker for clean state
-    A.reset_failed_login(test_phone)
+    reset_failed_login(test_phone)
     login_res = c.post("/api/login", json={"phone": test_phone, "otp": "123456"})
     assert login_res.status_code == 200
     token = login_res.json()["token"]
@@ -496,7 +497,7 @@ def test_reminders_notification_stub():
     cu = H("9000000001")
 
     # Clean today's notes for customer 1 so reminder can trigger
-    A.ex("delete from notes where customer_id = ?", 1)
+    ex("delete from notes where customer_id = ?", 1)
 
     res = c.post("/api/reminders/run", headers=ph)
     assert res.status_code == 200
