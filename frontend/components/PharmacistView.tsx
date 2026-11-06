@@ -70,17 +70,20 @@ function AddMedicine({ code, onToast, onAdded }: { code: string; onToast: (m: st
   const [results, setResults] = useState<any[]>([]);
   const [qty, setQty] = useState(1);
   const [busy, setBusy] = useState(false);
+  const latest = useRef(0); // a slow answer to an old search must not replace the newer list
 
   const search = async (value: string) => {
     setTerm(value);
+    const mine = ++latest.current;
     if (value.trim().length < 2) {
       setResults([]);
       return;
     }
     try {
-      setResults(await fetchApi(`medicines?term=${encodeURIComponent(value.trim())}`));
+      const rows = await fetchApi(`medicines?term=${encodeURIComponent(value.trim())}`);
+      if (mine === latest.current) setResults(rows);
     } catch (err: any) {
-      onToast(err.message || 'Could not search the list.');
+      if (mine === latest.current) onToast(err.message || 'Could not search the list.');
     }
   };
 
