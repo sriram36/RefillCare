@@ -3,18 +3,24 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, Check, ChevronDown, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { fetchApi, postApi, getToken, buildApiUrl } from '../lib/api';
+import { translate, type Language } from '../lib/i18n';
+
+type T = (k: string, vars?: Record<string, string | number>) => string;
 
 interface PharmacistViewProps {
   onToast: (msg: string) => void;
+  lang: Language;
 }
 
-const STATUS_TEXT: Record<string, string> = {
-  awaiting_pharmacist: 'Needs checking',
-  on_hold: 'Photo requested',
-  approved: 'Approved',
-  packed: 'Packed',
-  dispatched: 'Dispatched',
-  rejected: 'Rejected',
+const LOCALE: Record<Language, string> = { en: 'en-IN', bn: 'bn-IN', hi: 'hi-IN' };
+
+const STATUS_KEY: Record<string, string> = {
+  awaiting_pharmacist: 'ph_status_awaiting_pharmacist',
+  on_hold: 'ph_status_on_hold',
+  approved: 'ph_status_approved',
+  packed: 'ph_status_packed',
+  dispatched: 'ph_status_dispatched',
+  rejected: 'ph_status_rejected',
 };
 
 const STATUS_STYLE: Record<string, string> = {
@@ -31,20 +37,20 @@ const btnPrimary = 'inline-flex h-12 items-center justify-center gap-2 rounded-x
 const btnSecondary = 'inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-base font-semibold text-slate-900 hover:bg-slate-50';
 const fieldClass = 'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 focus:border-teal-700';
 
-function waited(created: number) {
+function waited(created: number, t: T) {
   const min = Math.max(0, Math.round((Date.now() / 1000 - created) / 60));
-  return min < 1 ? 'just now' : min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${min % 60} min`;
+  return min < 1 ? t('ph_just_now') : min < 60 ? t('ph_min', { n: min }) : t('ph_h_min', { h: Math.floor(min / 60), m: min % 60 });
 }
 
-function Badge({ status }: { status: string }) {
+function Badge({ status, t }: { status: string; t: T }) {
   return (
     <span className={`inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-sm font-semibold ${STATUS_STYLE[status] || 'bg-slate-100 text-slate-800'}`}>
-      {STATUS_TEXT[status] || status}
+      {STATUS_KEY[status] ? t(STATUS_KEY[status]) : status}
     </span>
   );
 }
 
-function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+function Modal({ title, children, onClose, t }: { title: string; children: React.ReactNode; onClose: () => void; t: T }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -55,7 +61,7 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
       <div role="dialog" aria-modal="true" aria-label={title} className="max-h-[92vh] w-full max-w-md space-y-5 overflow-y-auto rounded-2xl bg-white p-6">
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-xl font-bold text-slate-900">{title}</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100">
+          <button type="button" onClick={onClose} aria-label={t('ph_close')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100">
             <X className="h-6 w-6" aria-hidden="true" />
           </button>
         </div>
@@ -66,7 +72,7 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
 }
 
 /** Add a medicine the AI missed or read wrongly. The line starts as a draft, so it still needs approval. */
-function AddMedicine({ code, onToast, onAdded }: { code: string; onToast: (m: string) => void; onAdded: () => void }) {
+function AddMedicine({ code, onToast, onAdded, t }: { code: string; onToast: (m: string) => void; onAdded: () => void; t: T }) {
   const [term, setTerm] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [qty, setQty] = useState(1);
@@ -84,7 +90,7 @@ function AddMedicine({ code, onToast, onAdded }: { code: string; onToast: (m: st
       const rows = await fetchApi(`medicines?term=${encodeURIComponent(value.trim())}`);
       if (mine === latest.current) setResults(rows);
     } catch (err: any) {
-      if (mine === latest.current) onToast(err.message || 'Could not search the list.');
+      if (mine === latest.current) onToast(err.message || t('ph_err_search'));
     }
   };
 
@@ -92,13 +98,13 @@ function AddMedicine({ code, onToast, onAdded }: { code: string; onToast: (m: st
     setBusy(true);
     try {
       await postApi(`orders/${code}/items`, { med_id: m.id, qty });
-      onToast(`Added ${m.name.split(',')[0]}. Check it, then approve.`);
+      onToast(t('ph_added', { name: m.name.split(',')[0] }));
       setTerm('');
       setResults([]);
       setQty(1);
       onAdded();
     } catch (err: any) {
-      onToast(err.message || 'Could not add it.');
+      onToast(err.message || t('ph_err_add'));
     } finally {
       setBusy(false);
     }
@@ -106,16 +112,16 @@ function AddMedicine({ code, onToast, onAdded }: { code: string; onToast: (m: st
 
   return (
     <details className="rounded-xl border border-dashed border-slate-300 p-4">
-      <summary className="min-h-[2.75rem] cursor-pointer select-none text-base font-semibold text-slate-800">Add a medicine</summary>
+      <summary className="min-h-[2.75rem] cursor-pointer select-none text-base font-semibold text-slate-800">{t('ph_add_med')}</summary>
       <div className="mt-2 space-y-3">
-        <p className="text-base text-slate-600">For a medicine the AI missed or read wrongly. You still approve it.</p>
+        <p className="text-base text-slate-600">{t('ph_add_med_hint')}</p>
         <div className="flex gap-2">
           <input
             type="search"
             value={term}
             onChange={(e) => search(e.target.value)}
-            aria-label="Search the medicine list"
-            placeholder="Search by name"
+            aria-label={t('ph_search_aria')}
+            placeholder={t('ph_search_ph')}
             className={`${fieldClass} flex-1`}
           />
           <input
@@ -124,7 +130,7 @@ function AddMedicine({ code, onToast, onAdded }: { code: string; onToast: (m: st
             max={50}
             value={qty}
             onChange={(e) => setQty(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
-            aria-label="Packs to add"
+            aria-label={t('ph_packs_aria')}
             className="h-[3.25rem] w-20 rounded-xl border border-slate-300 px-3 text-center text-lg font-semibold"
           />
         </div>
@@ -136,7 +142,7 @@ function AddMedicine({ code, onToast, onAdded }: { code: string; onToast: (m: st
                   {m.name.split(',')[0]}
                   <span className="block text-slate-600">
                     {m.name.split(',').slice(1).join(',').trim()}
-                    {m.name.includes(',') ? ' · ' : ''}Schedule {m.schedule} · ₹{m.price}
+                    {m.name.includes(',') ? ' · ' : ''}{t('ph_schedule', { s: m.schedule })} · ₹{m.price}
                   </span>
                 </span>
                 <button
@@ -145,7 +151,7 @@ function AddMedicine({ code, onToast, onAdded }: { code: string; onToast: (m: st
                   onClick={() => add(m)}
                   className="h-11 shrink-0 rounded-xl border border-teal-700 px-4 text-base font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-60"
                 >
-                  Add
+                  {t('ph_add')}
                 </button>
               </li>
             ))}
@@ -156,7 +162,9 @@ function AddMedicine({ code, onToast, onAdded }: { code: string; onToast: (m: st
   );
 }
 
-export default function PharmacistView({ onToast }: PharmacistViewProps) {
+export default function PharmacistView({ onToast, lang }: PharmacistViewProps) {
+  const t: T = (k, vars) => translate(k, lang, vars);
+  const locale = LOCALE[lang] || 'en-IN';
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrderState] = useState<any | null>(null);
   // The refresh timer below was created on the first render, so it must not read selectedOrder from state:
@@ -179,7 +187,7 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
   const [rejectModal, setRejectModal] = useState<{ itemId: number } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [holdModal, setHoldModal] = useState<{ code: string } | null>(null);
-  const [holdReason, setHoldReason] = useState('Please upload a clearer photo of the prescription.');
+  const [holdReason, setHoldReason] = useState('');
   const [qtys, setQtys] = useState<Record<number, number>>({});
   const [showAllOthers, setShowAllOthers] = useState(false);
 
@@ -196,7 +204,7 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
         setSelectedOrder(null);
       }
     } catch (err: any) {
-      onToast(err.message || 'Could not load the queue.');
+      onToast(err.message || t('ph_err_queue'));
     } finally {
       setLoading(false);
     }
@@ -273,17 +281,17 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
     }
     try {
       await postApi(`items/${item.id}/decide`, { action: 'approve', qty });
-      onToast(`Approved ${item.name.split(',')[0]}`);
+      onToast(t('ph_approved_item', { name: item.name.split(',')[0] }));
       await loadOrders(selectedOrder.code);
     } catch (err: any) {
-      onToast(err.message || 'Could not approve.');
+      onToast(err.message || t('ph_err_approve'));
     }
   };
 
   const submitH1Approval = async () => {
     if (!h1Modal) return;
     if (!h1Doctor.trim() || !h1Patient.trim()) {
-      onToast('The H1 register needs both the prescriber and the patient.');
+      onToast(t('ph_h1_need'));
       return;
     }
     try {
@@ -293,53 +301,53 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
         prescriber: h1Doctor.trim(),
         patient: h1Patient.trim(),
       });
-      onToast('Approved and written to the H1 register.');
+      onToast(t('ph_h1_done'));
       setH1Modal(null);
       await loadOrders(selectedOrder.code);
     } catch (err: any) {
-      onToast(err.message || 'Could not approve.');
+      onToast(err.message || t('ph_err_approve'));
     }
   };
 
   const submitReject = async () => {
     if (!rejectModal) return;
     if (!rejectReason.trim()) {
-      onToast('Please give a reason.');
+      onToast(t('ph_reason_need'));
       return;
     }
     try {
       await postApi(`items/${rejectModal.itemId}/decide`, { action: 'reject', reason: rejectReason.trim() });
-      onToast('Rejected. The customer will see the reason.');
+      onToast(t('ph_rejected_done'));
       setRejectModal(null);
       await loadOrders(selectedOrder.code);
     } catch (err: any) {
-      onToast(err.message || 'Could not reject.');
+      onToast(err.message || t('ph_err_reject'));
     }
   };
 
   const submitHold = async () => {
     if (!holdModal) return;
     if (!holdReason.trim()) {
-      onToast('Please tell the customer what to fix.');
+      onToast(t('ph_hold_need'));
       return;
     }
     try {
       await postApi(`orders/${holdModal.code}/hold`, { reason: holdReason.trim() });
-      onToast('Asked the customer for a new photo.');
+      onToast(t('ph_hold_done'));
       setHoldModal(null);
       await loadOrders(selectedOrder.code);
     } catch (err: any) {
-      onToast(err.message || 'Could not send the request.');
+      onToast(err.message || t('ph_err_hold'));
     }
   };
 
   const handleOfferGeneric = async (item: any) => {
     try {
       await postApi(`items/${item.id}/offer-generic`);
-      onToast(`Offered ${item.generic.name.split(',')[0]} (generic). Waiting for the customer.`);
+      onToast(t('ph_offered', { name: item.generic.name.split(',')[0] }));
       await loadOrders(selectedOrder.code);
     } catch (err: any) {
-      onToast(err.message || 'Could not offer the generic.');
+      onToast(err.message || t('ph_err_offer'));
     }
   };
 
@@ -356,14 +364,14 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-lg font-bold text-slate-900">{o.code}</span>
-            <Badge status={o.status} />
+            <Badge status={o.status} t={t} />
           </div>
           <div className="mt-1 text-base text-slate-700">{o.for_name}</div>
           <div className="mt-1 truncate text-base text-slate-500">
-            {(o.items || []).map((i: any) => i.name.split(',')[0]).join(', ') || 'No lines read'}
+            {(o.items || []).map((i: any) => i.name.split(',')[0]).join(', ') || t('ph_no_lines')}
           </div>
           {o.status === 'awaiting_pharmacist' && (
-            <div className="mt-1 text-base font-medium text-amber-800">Waiting {waited(o.created)}</div>
+            <div className="mt-1 text-base font-medium text-amber-800">{t('ph_waiting', { time: waited(o.created, t) })}</div>
           )}
         </button>
       </li>
@@ -374,15 +382,15 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Verification queue</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('ph_tab_queue')}</h1>
           <p className="text-base text-slate-600">
-            {needsCheck.length === 0 ? 'Nothing is waiting.' : `${needsCheck.length} waiting for a pharmacist.`}
+            {needsCheck.length === 0 ? t('ph_nothing_waiting') : t('ph_n_waiting', { n: needsCheck.length })}
           </p>
         </div>
         <button
           onClick={() => loadOrders(selectedOrder?.code)}
           className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-          aria-label="Refresh the queue"
+          aria-label={t('ph_refresh')}
         >
           <RefreshCw className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -390,30 +398,30 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
 
       {loading && orders.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-lg text-slate-600" role="status">
-          Loading the queue…
+          {t('ph_loading_queue')}
         </div>
       ) : orders.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-lg text-slate-600">
-          No orders yet.
+          {t('ph_no_orders')}
         </div>
       ) : (
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
           <div className="space-y-5 lg:col-span-4">
             {needsCheck.length > 0 && (
-              <section aria-label="Needs checking" className="space-y-2">
-                <h2 className="text-base font-semibold text-slate-600">Needs checking ({needsCheck.length})</h2>
+              <section aria-label={t('ph_status_awaiting_pharmacist')} className="space-y-2">
+                <h2 className="text-base font-semibold text-slate-600">{t('ph_needs_heading', { n: needsCheck.length })}</h2>
                 <ul className="space-y-2">{needsCheck.map(queueRow)}</ul>
               </section>
             )}
             {others.length > 0 && (
-              <section aria-label="Other orders" className="space-y-2">
-                <h2 className="text-base font-semibold text-slate-600">Other orders ({others.length})</h2>
+              <section aria-label={t('ph_other_aria')} className="space-y-2">
+                <h2 className="text-base font-semibold text-slate-600">{t('ph_other_heading', { n: others.length })}</h2>
                 <ul className="space-y-2">
                   {(showAllOthers ? others : others.filter((o, i) => i < OTHERS_SHOWN || o.code === selectedOrder?.code)).map(queueRow)}
                 </ul>
                 {others.length > OTHERS_SHOWN && (
                   <button type="button" onClick={() => setShowAllOthers((v) => !v)} className={`${btnSecondary} h-11 w-full`}>
-                    {showAllOthers ? 'Show fewer' : `Show all ${others.length}`}
+                    {showAllOthers ? t('ph_show_fewer') : t('ph_show_all', { n: others.length })}
                   </button>
                 )}
               </section>
@@ -426,39 +434,45 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-3">
                     <h2 className="text-xl font-bold text-slate-900">{selectedOrder.code}</h2>
-                    <Badge status={selectedOrder.status} />
+                    <Badge status={selectedOrder.status} t={t} />
                   </div>
                   <p className="text-base text-slate-600">
-                    Patient <strong className="text-slate-900">{selectedOrder.for_name}</strong>
+                    {t('ph_patient')} <strong className="text-slate-900">{selectedOrder.for_name}</strong>
                     {' · '}
-                    {selectedOrder.store ? `Store: ${selectedOrder.store}` : 'No store yet'}
+                    {selectedOrder.store ? t('ph_store', { store: selectedOrder.store }) : t('ph_no_store')}
                   </p>
                 </div>
                 {selectedOrder.status === 'awaiting_pharmacist' && (
-                  <button onClick={() => setHoldModal({ code: selectedOrder.code })} className={btnSecondary}>
-                    Ask for a new photo
+                  <button
+                    onClick={() => {
+                      setHoldReason(t('ph_hold_default'));
+                      setHoldModal({ code: selectedOrder.code });
+                    }}
+                    className={btnSecondary}
+                  >
+                    {t('ph_ask_photo')}
                   </button>
                 )}
               </div>
 
               {selectedOrder.note && (
                 <p className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-base text-amber-950">
-                  <strong>Note:</strong> {selectedOrder.note}
+                  <strong>{t('ph_note')}</strong> {selectedOrder.note}
                 </p>
               )}
 
               {/* The point of this screen: the prescription and what was read from it, side by side */}
               <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
-                <section aria-label="Prescription" className="space-y-3 md:sticky md:top-24">
+                <section aria-label={t('ph_prescription')} className="space-y-3 md:sticky md:top-24">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-lg font-semibold text-slate-900">Prescription</h3>
+                    <h3 className="text-lg font-semibold text-slate-900">{t('ph_prescription')}</h3>
                     {rxImageUrl && (
                       <div className="flex items-center gap-1 rounded-xl border border-slate-300 p-1">
                         <button
                           type="button"
                           onClick={() => setZoomLevel((z) => Math.max(0.7, +(z - 0.2).toFixed(1)))}
                           className="h-10 w-10 rounded-lg text-lg font-bold text-slate-800 hover:bg-slate-100"
-                          aria-label="Zoom out"
+                          aria-label={t('ph_zoom_out')}
                         >
                           −
                         </button>
@@ -467,7 +481,7 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                           type="button"
                           onClick={() => setZoomLevel((z) => Math.min(2.5, +(z + 0.2).toFixed(1)))}
                           className="h-10 w-10 rounded-lg text-lg font-bold text-slate-800 hover:bg-slate-100"
-                          aria-label="Zoom in"
+                          aria-label={t('ph_zoom_in')}
                         >
                           +
                         </button>
@@ -475,34 +489,44 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                     )}
                   </div>
 
-                  <div className="flex max-h-[34rem] min-h-[10rem] items-start justify-center overflow-auto rounded-xl border border-slate-200 bg-stone-100 p-3">
-                    {rxLoading ? (
-                      <p className="self-center text-base text-slate-600" role="status">
-                        Opening the prescription…
-                      </p>
-                    ) : rxImageUrl ? (
-                      <img
-                        src={rxImageUrl}
-                        alt={`Prescription for ${selectedOrder.for_name}`}
-                        style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
-                        className="h-auto max-w-full rounded-lg border border-slate-200 bg-white"
-                      />
-                    ) : (
-                      <p className="self-center text-center text-base text-slate-600">No prescription file for this order.</p>
+                  <div className="relative">
+                    <div className="flex max-h-[34rem] min-h-[10rem] items-start justify-center overflow-auto rounded-xl border border-slate-200 bg-stone-100 p-3">
+                      {rxLoading ? (
+                        <p className="self-center text-base text-slate-600" role="status">
+                          {t('ph_rx_opening')}
+                        </p>
+                      ) : rxImageUrl ? (
+                        <img
+                          src={rxImageUrl}
+                          alt={t('ph_rx_alt', { name: selectedOrder.for_name })}
+                          style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
+                          className="h-auto max-w-full rounded-lg border border-slate-200 bg-white"
+                        />
+                      ) : (
+                        <p className="self-center text-center text-base text-slate-600">{t('ph_rx_none')}</p>
+                      )}
+                    </div>
+                    {['approved', 'packed', 'dispatched'].includes(selectedOrder.status) && (
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute bottom-4 right-5 max-w-[9rem] -rotate-6 select-none rounded-xl border-4 border-double border-teal-700 px-3 py-1.5 text-center text-sm font-bold leading-tight text-teal-800 opacity-70 mix-blend-multiply"
+                      >
+                        {t('ph_stamp')}
+                      </div>
                     )}
                   </div>
-                  <p className="text-base text-slate-500">Opening it is recorded in the access log below.</p>
+                  <p className="text-base text-slate-500">{t('ph_rx_logged')}</p>
                 </section>
 
-                <section aria-label="Matched items" className="space-y-3">
+                <section aria-label={t('ph_matched')} className="space-y-3">
                   <div className="flex items-baseline justify-between gap-2">
-                    <h3 className="text-lg font-semibold text-slate-900">Matched items</h3>
-                    <span className="text-base text-slate-500">AI draft. You decide.</span>
+                    <h3 className="text-lg font-semibold text-slate-900">{t('ph_matched')}</h3>
+                    <span className="text-base text-slate-500">{t('ph_ai_draft')}</span>
                   </div>
 
                   {(selectedOrder.items || []).length === 0 ? (
                     <p className="rounded-xl border border-slate-200 bg-stone-50 p-4 text-base text-slate-700">
-                      Nothing could be read. Add the medicines yourself below, or ask for a clearer photo.
+                      {t('ph_nothing_read')}
                     </p>
                   ) : (
                     (selectedOrder.items || []).map((item: any) => {
@@ -523,7 +547,7 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                             <div className="text-lg font-semibold leading-snug text-slate-900">{item.name.split(',')[0]}</div>
                             <div className="text-base text-slate-600">
                               {item.name.split(',').slice(1).join(',').trim()}
-                              {item.name.includes(',') ? ' · ' : ''}₹{item.price} each
+                              {item.name.includes(',') ? ' · ' : ''}{t('ph_price_each', { price: item.price })}
                             </div>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               <span
@@ -531,18 +555,17 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                                   item.schedule === 'H1' ? 'bg-amber-200 text-amber-950' : 'bg-slate-200 text-slate-800'
                                 }`}
                               >
-                                Schedule {item.schedule}
-                                {item.schedule === 'H1' ? ' · register' : ''}
+                                {item.schedule === 'H1' ? t('ph_schedule_h1', { s: item.schedule }) : t('ph_schedule', { s: item.schedule })}
                               </span>
                               <span
                                 className={`inline-flex items-center gap-1 text-base font-medium ${lowConf ? 'text-amber-800' : 'text-slate-600'}`}
                               >
                                 {item.reason === 'Added by pharmacist' ? (
-                                  'Added by you'
+                                  t('ph_added_by_you')
                                 ) : (
                                   <>
                                     {lowConf && <AlertTriangle className="h-4 w-4" aria-hidden="true" />}
-                                    {lowConf ? 'Check the image' : 'Read'} · {Math.round(item.conf * 100)}%
+                                    {t(lowConf ? 'ph_conf_low' : 'ph_conf_ok', { pct: Math.round(item.conf * 100) })}
                                   </>
                                 )}
                               </span>
@@ -552,7 +575,7 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                           {isDraft && !locked && (
                             <div className="flex flex-wrap items-end gap-3 border-t border-slate-200 pt-3">
                               <label className="text-base font-medium text-slate-700">
-                                Quantity
+                                {t('ph_quantity')}
                                 <input
                                   type="number"
                                   min={1}
@@ -564,7 +587,7 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                               </label>
                               <button onClick={() => handleApprove(item)} className={`${btnPrimary} flex-1`}>
                                 <Check className="h-5 w-5" aria-hidden="true" />
-                                Approve
+                                {t('ph_approve')}
                               </button>
                               <button
                                 onClick={() => {
@@ -573,7 +596,7 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                                 }}
                                 className={`${btnSecondary} text-rose-800`}
                               >
-                                Reject
+                                {t('ph_reject')}
                               </button>
                             </div>
                           )}
@@ -582,39 +605,39 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
                             <div className="space-y-2 border-t border-teal-200 pt-3 text-base">
                               <p className="flex items-center gap-2 font-semibold text-teal-900">
                                 <Check className="h-5 w-5" aria-hidden="true" />
-                                Approved · {item.qty} {item.qty === 1 ? 'pack' : 'packs'}
+                                {t(item.qty === 1 ? 'ph_approved_pack' : 'ph_approved_packs', { n: item.qty })}
                               </p>
                               {item.generic && !item.offer && !locked && (
                                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white p-3">
                                   <span className="text-slate-800">
-                                    Cheaper generic: <strong>{item.generic.name.split(',')[0]}</strong> ₹{item.generic.price}
+                                    {t('ph_cheaper')} <strong>{item.generic.name.split(',')[0]}</strong> ₹{item.generic.price}
                                   </span>
                                   <button onClick={() => handleOfferGeneric(item)} className="h-11 rounded-lg border border-teal-700 px-4 font-semibold text-teal-800 hover:bg-teal-50">
-                                    Offer to customer
+                                    {t('ph_offer')}
                                   </button>
                                 </div>
                               )}
                               {item.offer && (
                                 <p className="text-slate-700">
                                   {item.consent == null
-                                    ? 'Generic offered. Waiting for the customer to answer.'
+                                    ? t('ph_offer_waiting')
                                     : item.consent
-                                    ? 'Customer accepted the generic.'
-                                    : 'Customer kept the prescribed brand.'}
+                                    ? t('ph_offer_yes')
+                                    : t('ph_offer_no')}
                                 </p>
                               )}
                             </div>
                           )}
 
                           {isRejected && (
-                            <p className="border-t border-slate-200 pt-3 text-base font-medium text-slate-700">Rejected: {item.reason}</p>
+                            <p className="border-t border-slate-200 pt-3 text-base font-medium text-slate-700">{t('ph_rejected_reason', { reason: item.reason })}</p>
                           )}
                         </div>
                       );
                     })
                   )}
                   {!['on_hold', 'packed', 'dispatched'].includes(selectedOrder.status) && (
-                    <AddMedicine code={selectedOrder.code} onToast={onToast} onAdded={() => loadOrders(selectedOrder.code)} />
+                    <AddMedicine code={selectedOrder.code} onToast={onToast} onAdded={() => loadOrders(selectedOrder.code)} t={t} />
                   )}
                 </section>
               </div>
@@ -622,18 +645,18 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
               <details className="group border-t border-slate-200 pt-4">
                 <summary className="flex min-h-[2.75rem] cursor-pointer select-none items-center gap-2 text-base font-semibold text-slate-700">
                   <ShieldCheck className="h-5 w-5 text-teal-700" aria-hidden="true" />
-                  Who opened this prescription
+                  {t('ph_audit_title')}
                   <ChevronDown className="ml-auto h-5 w-5 transition-transform group-open:rotate-180" aria-hidden="true" />
                 </summary>
                 <div className="mt-3 max-h-48 space-y-1 overflow-y-auto rounded-xl bg-stone-50 p-4 text-base text-slate-700">
                   {loadingAudit ? (
-                    <p>Loading…</p>
+                    <p>{t('ph_loading')}</p>
                   ) : auditLogs.length === 0 ? (
-                    <p>Nobody has opened it yet.</p>
+                    <p>{t('ph_audit_none')}</p>
                   ) : (
                     auditLogs.map((log: any, idx: number) => (
                       <p key={idx}>
-                        {new Date(log.ts * 1000).toLocaleTimeString()} · <strong>{log.actor}</strong> · {log.action}
+                        {new Date(log.ts * 1000).toLocaleTimeString(locale)} · <strong>{log.actor}</strong> · {log.action}
                       </p>
                     ))
                   )}
@@ -645,61 +668,61 @@ export default function PharmacistView({ onToast }: PharmacistViewProps) {
       )}
 
       {h1Modal && (
-        <Modal title="Schedule H1 register" onClose={() => setH1Modal(null)}>
+        <Modal title={t('ph_h1_title')} onClose={() => setH1Modal(null)} t={t}>
           <p className="text-base text-slate-700">
-            Schedule H1 medicines need the prescriber and patient written in the H1 register before they are sold.
+            {t('ph_h1_body')}
           </p>
           <div className="space-y-2">
             <label htmlFor="h1-doc" className="block text-base font-semibold text-slate-800">
-              Prescriber name and registration number
+              {t('ph_h1_doc_label')}
             </label>
-            <input id="h1-doc" value={h1Doctor} onChange={(e) => setH1Doctor(e.target.value)} placeholder="Dr A. Banerjee, WBMC-12345" className={fieldClass} />
+            <input id="h1-doc" value={h1Doctor} onChange={(e) => setH1Doctor(e.target.value)} placeholder={t('ph_h1_doc_ph')} className={fieldClass} />
             <button type="button" onClick={() => setH1Doctor('Dr. Sample Doctor, WBMC-00000')} className="min-h-[2.75rem] text-base font-semibold text-teal-700 underline underline-offset-4">
-              Fill a sample (demo)
+              {t('ph_h1_sample')}
             </button>
           </div>
           <div className="space-y-2">
             <label htmlFor="h1-pat" className="block text-base font-semibold text-slate-800">
-              Patient name
+              {t('ph_patient_name')}
             </label>
             <input id="h1-pat" value={h1Patient} onChange={(e) => setH1Patient(e.target.value)} className={fieldClass} />
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <button onClick={() => setH1Modal(null)} className={btnSecondary}>
-              Cancel
+              {t('ph_cancel')}
             </button>
             <button onClick={submitH1Approval} className={btnPrimary}>
-              Write to register and approve
+              {t('ph_h1_submit')}
             </button>
           </div>
         </Modal>
       )}
 
       {rejectModal && (
-        <Modal title="Reject this medicine" onClose={() => setRejectModal(null)}>
-          <p className="text-base text-slate-700">The customer will see your reason. For example: dose unclear, prescription expired.</p>
-          <textarea rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} aria-label="Reason" className={fieldClass} />
+        <Modal title={t('ph_reject_title')} onClose={() => setRejectModal(null)} t={t}>
+          <p className="text-base text-slate-700">{t('ph_reject_body')}</p>
+          <textarea rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} aria-label={t('ph_reason')} className={fieldClass} />
           <div className="grid gap-2 sm:grid-cols-2">
             <button onClick={() => setRejectModal(null)} className={btnSecondary}>
-              Cancel
+              {t('ph_cancel')}
             </button>
             <button onClick={submitReject} className="inline-flex h-12 items-center justify-center rounded-xl bg-rose-700 px-5 text-base font-semibold text-white hover:bg-rose-800">
-              Reject
+              {t('ph_reject')}
             </button>
           </div>
         </Modal>
       )}
 
       {holdModal && (
-        <Modal title="Ask for a new photo" onClose={() => setHoldModal(null)}>
-          <p className="text-base text-slate-700">The order is put on hold and the customer is asked to send a clearer photo.</p>
-          <input value={holdReason} onChange={(e) => setHoldReason(e.target.value)} aria-label="Message to the customer" className={fieldClass} />
+        <Modal title={t('ph_ask_photo')} onClose={() => setHoldModal(null)} t={t}>
+          <p className="text-base text-slate-700">{t('ph_hold_body')}</p>
+          <input value={holdReason} onChange={(e) => setHoldReason(e.target.value)} aria-label={t('ph_hold_aria')} className={fieldClass} />
           <div className="grid gap-2 sm:grid-cols-2">
             <button onClick={() => setHoldModal(null)} className={btnSecondary}>
-              Cancel
+              {t('ph_cancel')}
             </button>
             <button onClick={submitHold} className={btnPrimary}>
-              Send request
+              {t('ph_send_request')}
             </button>
           </div>
         </Modal>
