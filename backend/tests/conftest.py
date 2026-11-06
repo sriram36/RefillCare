@@ -13,6 +13,11 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+# backend/.env may hold real AI keys and the app loads it on its own. Empty strings (not removal) stop that,
+# so no test can ever call an outside service.
+os.environ["AZURE_OPENAI_ENDPOINT"] = ""
+os.environ["AZURE_OPENAI_KEY"] = ""
+
 
 @pytest.fixture(autouse=True, scope="module")
 def fresh_database():
