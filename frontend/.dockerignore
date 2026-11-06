@@ -1,0 +1,11 @@
+# The image installs its own Linux dependencies and builds itself.
+# Copying the host's node_modules / .next is slow and brings Windows binaries into a Linux image.
+node_modules
+.next
+out
+# Local env files stay local: the API address is passed in as a build argument instead
+.env
+.env.*
+!.env.example
+*.log
+tsconfig.tsbuildinfo

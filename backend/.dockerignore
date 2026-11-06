@@ -1,0 +1,12 @@
+# Keep local secrets and patient data out of the image
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+rx_store
+__pycache__
+*.pyc
+.venv
+.pytest_cache
+tests
