@@ -37,7 +37,7 @@ RefillCare/
 │   │   ├── catalog.py        # Medicine catalog & generic mappings
 │   │   ├── routing.py        # Nearest-store inventory routing
 │   │   └── notifications.py  # SMS / WhatsApp dispatch logging
-│   ├── tests/                # 69 automated tests: the approval gate on every order path, stock, payments, ownership, DPDP
+│   ├── tests/                # 70 automated tests: the approval gate on every order path, stock, payments, ownership, DPDP
 │   ├── requirements.txt      # Python dependencies
 │   └── Dockerfile            # Container configuration for Render
 ├── frontend/                 # Dedicated Next.js 14 App Router client
@@ -171,7 +171,7 @@ All test accounts authenticate using OTP: **`123456`**.
 ## Automated Verification & Tests
 
 ```bash
-# 1. Backend safety gate & business rule tests (69 tests)
+# 1. Backend safety gate & business rule tests (70 tests)
 cd backend
 python -m pytest tests -q
 
