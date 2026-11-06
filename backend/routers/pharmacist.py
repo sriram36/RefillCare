@@ -1,16 +1,27 @@
-import os
 import time
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
-from core.config import STORE
-from core.storage import get_decrypted_rx
+from core.storage import get_decrypted_rx, rx_exists
 from core.security import auth, need
 from database.session import ex, log, q
-from rules import RX_VALID_DAYS, rule
-from services.routing import settle
+import rules
+from rules import rule
+from services.routing import FROZEN, pick_store, settle
 
 router = APIRouter(prefix="/api", tags=["Pharmacist Verification"])
+
+
+def editable_order(code: str) -> dict:
+    """The order, if a pharmacist may still decide on it. Not after hold, packing or dispatch."""
+    order = q("select * from orders where code = ?", code, one=True)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order["status"] == "on_hold":
+        raise HTTPException(409, "Order is on hold until the customer sends a new prescription")
+    if order["status"] in FROZEN:
+        raise HTTPException(409, f"Order is already {order['status']}, so decisions are locked")
+    return order
 
 
 class Decision(BaseModel):
@@ -36,7 +47,8 @@ def get_rx_image(code: str, u=Depends(auth)):
     except FileNotFoundError:
         raise HTTPException(404, "Prescription file not found on disk")
     log(u["name"], "view_rx", code)
-    return Response(content=decrypted_bytes, media_type="image/png")
+    kind = "image/jpeg" if decrypted_bytes[:3] == b"\xff\xd8\xff" else "image/png"
+    return Response(content=decrypted_bytes, media_type=kind, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/orders/{code}/audit")
@@ -60,9 +72,7 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
     if not item:
         raise HTTPException(404, "Item not found")
 
-    order = q("select * from orders where code = ?", item["order_code"], one=True)
-    if not order:
-        raise HTTPException(404, "Order not found")
+    order = editable_order(item["order_code"])
 
     if d.action == "reject":
         if not d.reason.strip():
@@ -73,6 +83,8 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
             iid,
         )
     elif d.action == "approve":
+        if rule(item["schedule"])["blocked"]:
+            raise HTTPException(422, f"Schedule {item['schedule']} medicines cannot be sold online. Reject this line")
         if item["med_id"] is None:
             raise HTTPException(
                 422, "Not in catalog. Reject this line or ask for a new prescription"
@@ -84,11 +96,7 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
         # Step 2: Prescription validation for prescription-only (Rx) items
         if rule(item["schedule"])["rx"]:
             today_str = date.today().isoformat()
-            store_dir = os.getenv("RX_STORE_PATH", STORE)
-            has_order_file = bool(order["rx_file"] and (
-                os.path.exists(os.path.join(store_dir, order["rx_file"])) or
-                os.path.exists(os.path.join(STORE, order["rx_file"]))
-            ))
+            has_order_file = rx_exists(order["rx_file"])
             valid_record = q(
                 "select * from prescriptions where customer_id = ? and profile_name = ? and valid_until >= ? order by valid_until desc limit 1",
                 order["customer_id"],
@@ -102,10 +110,11 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
                     "Prescription-only medicine cannot be approved without an uploaded prescription or a valid prescription record on file",
                 )
 
-            # Store or refresh prescription record if order has an uploaded image
-            if has_order_file:
+            # Record validity only for a NEW prescription. A refill that reuses the one on file
+            # must not restart the clock, or an old prescription would never expire.
+            if has_order_file and not order.get("rx_reused"):
                 approved_at = today_str
-                valid_until = (date.today() + timedelta(days=RX_VALID_DAYS)).isoformat()
+                valid_until = (date.today() + timedelta(days=rules.RX_VALID_DAYS)).isoformat()
                 existing_rx = q(
                     "select id from prescriptions where customer_id = ? and profile_name = ?",
                     order["customer_id"],
@@ -138,15 +147,25 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
                     422,
                     "H1 medicines need the prescriber and patient name for the register",
                 )
-            ex(
-                "insert into register values(?, ?, ?, ?, ?, ?)",
-                item["order_code"],
-                iid,
-                d.prescriber.strip()[:80],
-                d.patient.strip()[:80],
-                qty,
-                int(time.time()),
-            )
+            if q("select 1 x from register where item_id = ?", iid, one=True):
+                # approving again (for example to edit the quantity) updates the one entry
+                ex(
+                    "update register set prescriber = ?, patient = ?, qty = ? where item_id = ?",
+                    d.prescriber.strip()[:80],
+                    d.patient.strip()[:80],
+                    qty,
+                    iid,
+                )
+            else:
+                ex(
+                    "insert into register values(?, ?, ?, ?, ?, ?)",
+                    item["order_code"],
+                    iid,
+                    d.prescriber.strip()[:80],
+                    d.patient.strip()[:80],
+                    qty,
+                    int(time.time()),
+                )
 
         ex(
             "update items set status = 'approved', approved_by = ?, qty = ? where id = ?",
@@ -165,6 +184,11 @@ def decide(iid: int, d: Decision, u=Depends(auth)):
 @router.post("/orders/{code}/hold")
 def hold(code: str, b: Hold, u=Depends(auth)):
     need(u, "pharmacist")
+    order = q("select status from orders where code = ?", code, one=True)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order["status"] in FROZEN and order["status"] != "on_hold":
+        raise HTTPException(409, f"Order is already {order['status']}")
     note = b.reason.strip()[:200] or "Please upload a clearer prescription."
     ex("update orders set status = 'on_hold', note = ? where code = ?", note, code)
     log(u["name"], "ask_reupload", code)
@@ -177,12 +201,15 @@ def offer(iid: int, u=Depends(auth)):
     it = q("select * from items where id = ?", iid, one=True)
     if not it:
         raise HTTPException(404, "Item not found")
+    editable_order(it["order_code"])
     if it["status"] != "approved":
         raise HTTPException(422, "Approve the line before offering a generic")
 
     g = q("select * from meds where generic_of = ?", it["med_id"], one=True)
     if not g:
         raise HTTPException(422, "No generic on file for this medicine")
+    if not pick_store(it["order_code"], [(g["id"], it["qty"])]):
+        raise HTTPException(422, "No store has this generic in stock right now")
 
     ex("update items set offer = ? where id = ?", g["id"], iid)
     log(u["name"], "offer_generic", f"item {iid}")

@@ -2,8 +2,9 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from core.security import auth, need
-from database.session import ex, log, q
+from database.session import ex, exc, log, q
 from rules import can_dispatch
+from services.routing import reserve_stock
 
 router = APIRouter(prefix="/api", tags=["Store Fulfillment"])
 
@@ -27,6 +28,13 @@ def advance(code: str, frm: str, to: str, u: dict, inv: str | None = None):
         raise HTTPException(403, "This order belongs to another store")
     if order["status"] != frm or not order["store_id"]:
         raise HTTPException(409, f"Order must be {frm} and routed to a store first")
+
+    if to == "packed":
+        lines = [(i["med_id"], i["qty"]) for i in items if i["status"] == "approved"]
+        short = reserve_stock(order["store_id"], lines)
+        if short:
+            log(u["name"], "blocked_packed_no_stock", code)
+            raise HTTPException(409, f"Not enough stock of {short}. Ask for a transfer or let the pharmacist re-route")
 
     ex(
         "update orders set status = ?, invoice_no = coalesce(?, invoice_no) where code = ?",
@@ -107,6 +115,11 @@ def request_transfer(b: TransferRequest, u=Depends(auth)):
         raise HTTPException(400, "Cannot transfer stock to the same store")
     if b.qty <= 0:
         raise HTTPException(400, "Quantity must be positive")
+    if not q("select 1 x from meds where id = ?", b.med_id, one=True):
+        raise HTTPException(404, "Medicine not found")
+    for sid in (from_store, to_store):
+        if not q("select 1 x from stores where id = ?", sid, one=True):
+            raise HTTPException(404, f"Store {sid} not found")
 
     now = int(time.time())
     tid = ex(
@@ -129,18 +142,22 @@ def fulfill_transfer(tid: int, u=Depends(auth)):
         raise HTTPException(404, "Transfer record not found")
     if tr["status"] == "fulfilled":
         raise HTTPException(409, "Transfer is already fulfilled")
+    if u["store_id"] != tr["from_store_id"]:
+        raise HTTPException(403, "Only the store sending the stock can fulfil this transfer")
 
-    now = int(time.time())
-    from_stock = q("select qty from stock where store_id = ? and med_id = ?", tr["from_store_id"], tr["med_id"], one=True)
-    curr_from = from_stock["qty"] if from_stock else 0
-    new_from = max(0, curr_from - tr["qty"])
-    ex("insert or replace into stock(store_id, med_id, qty) values(?, ?, ?)", tr["from_store_id"], tr["med_id"], new_from)
-
-    to_stock = q("select qty from stock where store_id = ? and med_id = ?", tr["to_store_id"], tr["med_id"], one=True)
-    curr_to = to_stock["qty"] if to_stock else 0
-    new_to = curr_to + tr["qty"]
-    ex("insert or replace into stock(store_id, med_id, qty) values(?, ?, ?)", tr["to_store_id"], tr["med_id"], new_to)
-
-    ex("update transfers set status = 'fulfilled', fulfilled_at = ? where id = ?", now, tid)
+    # claim the transfer first so a double tap cannot move stock twice
+    if not exc("update transfers set status = 'fulfilled', fulfilled_at = ? where id = ? and status != 'fulfilled'", int(time.time()), tid):
+        raise HTTPException(409, "Transfer is already fulfilled")
+    if not exc(
+        "update stock set qty = qty - ? where store_id = ? and med_id = ? and qty >= ?",
+        tr["qty"], tr["from_store_id"], tr["med_id"], tr["qty"],
+    ):
+        ex("update transfers set status = 'requested', fulfilled_at = null where id = ?", tid)
+        raise HTTPException(409, "Not enough stock here to send this transfer")
+    if not exc(
+        "update stock set qty = qty + ? where store_id = ? and med_id = ?",
+        tr["qty"], tr["to_store_id"], tr["med_id"],
+    ):
+        ex("insert into stock(store_id, med_id, qty) values(?, ?, ?)", tr["to_store_id"], tr["med_id"], tr["qty"])
     log(u["name"], "fulfill_transfer", f"transfer-{tid}")
     return {"id": tid, "status": "fulfilled"}
