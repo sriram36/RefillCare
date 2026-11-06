@@ -1,14 +1,15 @@
 import csv
 import io
 import statistics
-import time
-from datetime import date
+from datetime import date, timedelta
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from core.config import REMINDER_HOUR
 from core.security import auth, need
-from database.session import db, ex, log, q
-from rules import days_left, rule
-from services.messages import refill_reminder
-from services.notifications import notify
+from database.session import db, log, q
+from rules import rule
+from services import reminders
+from services.notifications import mask
+from services.reminders import send_due_reminders
 
 router = APIRouter(prefix="/api", tags=["Operations Dashboard"])
 
@@ -79,8 +80,27 @@ def dashboard(u=Depends(auth)):
         if r["blocked"] or (r["rx"] and not (it["status"] == "approved" and it["approved_by"])):
             unapproved_dispatches += 1
 
+    today = date.today()
+    per_day = {(today - timedelta(days=n)).isoformat(): 0 for n in range(20, -1, -1)}
+    for o in all_orders:
+        day = date.fromtimestamp(o["created"]).isoformat()
+        if day in per_day:
+            per_day[day] += 1
+    last_auto = q("select ts from audit where action = 'auto_reminders' order by ts desc limit 1", one=True)
+    outbox = [
+        {"ts": m["ts"], "channel": m["channel"], "to": mask(m["phone"] or ""), "text": m["text"]}
+        for m in q("select * from outbox order by ts desc, id desc limit 8")
+    ]
+
     return {
         "by_store": by_store,
+        "orders_per_day": [{"day": d, "orders": n} for d, n in per_day.items()],
+        "reminder_schedule": {
+            "automatic": reminders.SCHEDULER_ON and REMINDER_HOUR >= 0,
+            "hour": REMINDER_HOUR,
+            "last_run": last_auto["ts"] if last_auto else None,
+        },
+        "outbox": outbox,
         "rejections": rejections,
         "unapproved_dispatches": unapproved_dispatches,
         "awaiting_now": sum(1 for o in all_orders if o["status"] == "awaiting_pharmacist"),
@@ -127,39 +147,6 @@ async def upload_stock_csv(file: UploadFile = File(...), u=Depends(auth)):
 @router.post("/reminders/run")
 def run_reminders(u=Depends(auth)):
     need(u, "pharmacist")
-    count = 0
-    notified = []
-    today = date.today().isoformat()
-
-    for r in q(
-        "select r.*, m.name, u.phone, u.lang from refills r "
-        "join meds m on m.id = r.med_id "
-        "join users u on u.id = r.customer_id"
-    ):
-        left = days_left(r["qty"], r["per_day"], r["last_filled"])
-        # one reminder per refill per day, whatever language it was sent in
-        key = f"refill:{r['id']}"
-
-        if left <= 5 and not q(
-            "select 1 x from notes where customer_id = ? and day = ? and key = ?",
-            r["customer_id"],
-            today,
-            key,
-            one=True,
-        ):
-            msg = refill_reminder(r.get("lang") or "en", r["name"].split(",")[0], r["for_name"], left)
-            ex(
-                "insert into notes(customer_id, text, ts, day, key) values(?, ?, ?, ?, ?)",
-                r["customer_id"],
-                msg,
-                int(time.time()),
-                today,
-                key,
-            )
-            if r.get("phone"):
-                notify(r["phone"], msg)
-                notified.append(r["phone"])
-            count += 1
-
-    log(u["name"], "run_reminders", f"{count} sent")
-    return {"sent": count, "notified": notified}
+    result = send_due_reminders()
+    log(u["name"], "run_reminders", f"{result['sent']} sent")
+    return result

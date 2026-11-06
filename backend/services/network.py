@@ -78,7 +78,7 @@ def build_history(now: int | None = None, seed: int = 7) -> dict:
         code = f"RX-{FIRST_CODE + n}"
         cid, cname, _, _ = rng.choice(HISTORY_CUSTOMERS)
         store = rng.choices(STORES, weights)[0]
-        created = now - rng.randint(1, 21) * 86400 - rng.randint(0, 8 * 3600) - 1800
+        created = now - rng.randint(1, 19) * 86400 - rng.randint(0, 8 * 3600) - 1800
         rejected = n % 9 == 4  # about one in nine
         verify_min = rng.triangular(3, 13, 6)
         verified = created + int(verify_min * 60)
